@@ -43,6 +43,8 @@ final class ContextTracker: ObservableObject {
     /// While stepping with back/forward: the history index on screen now. History is not
     /// reordered during navigation, like a browser; doing something new ends it.
     @Published private(set) var navIndex: Int?
+    /// What the screen looked like right after the last back/forward; any change ends navigation.
+    private var navScreen: [CGWindowID: CGRect] = [:]
     private let maxHistory = 25
     private let url = Prefs.supportDirectory.appendingPathComponent("contexts.json")
 
@@ -63,8 +65,8 @@ final class ContextTracker: ObservableObject {
         let visible = Windows.visibleWindowIDs()
         let key = visible.signature
         guard !key.isEmpty else { return }
-        if let n = navIndex {
-            if history.indices.contains(n), history[n].signature.isSubset(of: key) { return }
+        if navIndex != nil {
+            if sameScreen(visible) { return }
             navIndex = nil
         }
         if candidate?.key != key { candidate = (key, Date()); return }
@@ -119,9 +121,26 @@ final class ContextTracker: ObservableObject {
 
     /// Index we are viewing via back/forward, if the screen still shows it.
     private var stillNavigating: Int? {
-        guard let n = navIndex, history.indices.contains(n),
-              history[n].signature.isSubset(of: Windows.visibleWindowIDs().signature) else { return nil }
+        guard let n = navIndex, history.indices.contains(n), sameScreen(Windows.visibleWindowIDs()) else { return nil }
         return n
+    }
+
+    private func sameScreen(_ visible: [CGWin]) -> Bool {
+        guard visible.count == navScreen.count else { return false }
+        return visible.allSatisfy { w in
+            guard let f = navScreen[w.id] else { return false }
+            return abs(f.minX - w.frame.minX) + abs(f.minY - w.frame.minY) + abs(f.width - w.frame.width) + abs(f.height - w.frame.height) <= 40
+        }
+    }
+
+    /// The set is on screen as it was: every window visible at (about) its saved position.
+    /// Comparing positions matters: "B on the right half" and "B full screen" are different sets.
+    private func isShowing(_ ctx: WindowContext, _ visible: [CGWin]) -> Bool {
+        let frames = Dictionary(visible.map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
+        return ctx.windows.allSatisfy { w in
+            guard let f = frames[w.windowID] else { return false }
+            return abs(f.minX - w.frame.minX) + abs(f.minY - w.frame.minY) + abs(f.width - w.frame.width) + abs(f.height - w.frame.height) <= 40
+        }
     }
 
     /// ⌥`: one step back in history (keeps going further on repeated presses).
@@ -135,8 +154,8 @@ final class ContextTracker: ObservableObject {
             prune()
             from = 0
         }
-        let now = Windows.visibleWindowIDs().signature
-        guard let i = history.indices.dropFirst(from).first(where: { !history[$0].signature.isSubset(of: now) }) else {
+        let now = Windows.visibleWindowIDs()
+        guard let i = history.indices.dropFirst(from).first(where: { !isShowing(history[$0], now) }) else {
             NSSound.beep(); return
         }
         log.notice("back -> #\(i, privacy: .public) \(self.history[i].label, privacy: .public)")
@@ -146,8 +165,8 @@ final class ContextTracker: ObservableObject {
     /// ⌥⇧`: one step forward, back towards the most recent set.
     func goForward() async {
         guard let n = stillNavigating, n > 0 else { NSSound.beep(); return }
-        let now = Windows.visibleWindowIDs().signature
-        let i = (0..<n).reversed().first(where: { !history[$0].signature.isSubset(of: now) }) ?? 0
+        let now = Windows.visibleWindowIDs()
+        guard let i = (0..<n).reversed().first(where: { !isShowing(history[$0], now) }) else { NSSound.beep(); return }
         log.notice("forward -> #\(i, privacy: .public) \(self.history[i].label, privacy: .public)")
         await navigate(to: i)
     }
@@ -158,8 +177,10 @@ final class ContextTracker: ObservableObject {
         let ctx = history[i]
         await undoPulls(since: ctx)
         await Actions.restore(ctx.windows, applyFrames: true, launchMissing: false)
+        try? await Task.sleep(nanoseconds: 300_000_000) // let the last raise/resize settle
         candidate = nil
         navIndex = i
+        navScreen = Dictionary(Windows.visibleWindowIDs().map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
     }
 
     /// Sends windows Focal pulled over since `ctx` was on screen back to where they were.
