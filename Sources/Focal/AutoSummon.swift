@@ -21,6 +21,7 @@ final class AutoSummon {
 
     private func appActivated(_ app: NSRunningApplication) {
         pending?.cancel()
+        log.notice("activated \(app.localizedName ?? "?", privacy: .public) busy=\(Actions.isBusy, privacy: .public)")
         guard Prefs.bool(Prefs.Key.autoSummon), AX.isTrusted, !Actions.isBusy,
               app.activationPolicy == .regular, app.processIdentifier != Windows.ownPID,
               !Prefs.ignoredBundleIDs.contains(app.bundleIdentifier ?? "") else { return }
@@ -29,6 +30,7 @@ final class AutoSummon {
             try? await Task.sleep(nanoseconds: 450_000_000)
             guard !Task.isCancelled, !Actions.isBusy,
                   NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else { return }
+            log.notice("auto-summon check \(app.localizedName ?? "?", privacy: .public)")
             await fix(app)
         }
     }
@@ -58,13 +60,14 @@ final class AutoSummon {
             await Actions.bringHere(minimized, pid: pid)
             return
         }
-        if let off = Windows.offSpaceWindows(pid).first {
-            guard Prefs.bool(Prefs.Key.pullFromOtherSpace), let el = AX.window(pid: pid, id: off.id) else { return }
-            await Actions.bringHere(el, pid: pid)
+        // The window server also lists hidden (closed-but-kept) windows here; only a real AX window
+        // proves the app has a window on another Space.
+        if let off = Windows.offSpaceWindows(pid).first, let el = AX.window(pid: pid, id: off.id) {
+            if Prefs.bool(Prefs.Key.pullFromOtherSpace) { await Actions.bringHere(el, pid: pid) }
             return
         }
         if local.isEmpty, !app.isHidden, Prefs.bool(Prefs.Key.reopenWhenNoWindows) {
-            Actions.reopen(app)
+            await Actions.reopenHere(app, moveToCurrentDisplay: Prefs.bool(Prefs.Key.pullFromOtherDisplay))
         }
     }
 }

@@ -44,6 +44,18 @@ Chrome + серіал, ти переходиш у Telegram і повертаєш
 6. **Діагностика налаштувань macOS**, які заважають (автоперестановка Spaces,
    Stage Manager тощо), з кнопкою виправлення.
 
+## Керування з Shortcuts / Raycast / терміналу
+
+```bash
+open -g "focal://switcher"      # показати/сховати перемикач
+open -g "focal://back"          # попередній набір вікон
+open -g "focal://summon"        # притягнути активне вікно сюди
+open -g "focal://save?name=Робота"
+open -g "focal://layout?n=1"    # відновити набір №1
+open -g "focal://focus?id=123"  # підняти вікно за id
+open -g "focal://dump"          # стан у ~/Library/Application Support/Focal/state.json
+```
+
 ## Встановлення
 
 ```bash

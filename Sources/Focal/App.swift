@@ -52,6 +52,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Task { await contexts.goBack() }
     }
 
+    // MARK: URL scheme (Shortcuts, Raycast, scripts): focal://switcher, back, summon, save?name=X, layout?n=1, dump
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "focal" {
+            let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            switch url.host {
+            case "switcher": switcher.toggle()
+            case "back": goBack()
+            case "summon": Task { await Actions.summonFrontmost() }
+            case "save": _ = layouts.saveCurrent(named: q.first { $0.name == "name" }?.value ?? "Набір \(layouts.layouts.count + 1)")
+            case "layout": Task { await layouts.restore(at: (Int(q.first { $0.name == "n" }?.value ?? "") ?? 0) - 1) }
+            case "settings": showSettings()
+            case "dump": dump()
+            case "focus":
+                if let id = q.first(where: { $0.name == "id" })?.value.flatMap(CGWindowID.init),
+                   let w = Windows.items().first(where: { $0.id == id }) {
+                    Task { await Actions.bringHere(w.element, pid: w.pid, moveToCurrentDisplay: false) }
+                }
+            default: NSSound.beep()
+            }
+        }
+    }
+
+    /// Writes Focal's view of the world to Application Support/Focal/state.json (for debugging).
+    private func dump() {
+        contexts.prune()
+        let state: [String: Any] = [
+            "trusted": AX.isTrusted,
+            "mouseScreen": Screens.current.localizedName,
+            "windows": Windows.items().map { w in
+                ["id": w.id, "app": w.app.localizedName ?? "", "title": w.title, "minimized": w.isMinimized,
+                 "onScreen": w.isOnScreen, "screen": Screens.screen(for: w.frame)?.localizedName ?? "none",
+                 "frame": [w.frame.minX, w.frame.minY, w.frame.width, w.frame.height]] as [String: Any]
+            },
+            "visible": Windows.visibleWindowIDs().map(\.id),
+            "contexts": contexts.history.map { ["label": $0.label, "ids": $0.windows.map(\.windowID)] as [String: Any] },
+            "layouts": layouts.layouts.map(\.name),
+            "failedHotKeys": failedHotKeys,
+        ]
+        let url = Prefs.supportDirectory.appendingPathComponent("state.json")
+        if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: url)
+        }
+    }
+
     // MARK: Menu
 
     func menuNeedsUpdate(_ menu: NSMenu) {

@@ -9,6 +9,10 @@ enum Actions {
 
     private static func sleep(_ ms: UInt64) async { try? await Task.sleep(nanoseconds: ms * 1_000_000) }
 
+    /// Windows Focal pulled to another display, with where they were, so "back" can undo it.
+    struct Pull { let pid: pid_t; let from: CGRect; let date: Date }
+    static var pulled: [CGWindowID: Pull] = [:]
+
     static func beginBusy() { busyGeneration += 1; isBusy = true }
     static func endBusy(after ms: UInt64 = 700) {
         let gen = busyGeneration
@@ -52,6 +56,21 @@ enum Actions {
         NSWorkspace.shared.openApplication(at: url, configuration: cfg)
     }
 
+    /// Reopens the app and then brings the window it creates to the display I am on.
+    static func reopenHere(_ app: NSRunningApplication, moveToCurrentDisplay: Bool = true) async {
+        let target = Screens.current
+        reopen(app)
+        for _ in 0..<20 {
+            await sleep(150)
+            if let el = AX.windows(app.processIdentifier).first(where: { AX.bool($0, kAXMinimizedAttribute) != true }) {
+                if moveToCurrentDisplay, let f = AX.frame(el), Screens.screen(for: f) !== target {
+                    await bringHere(el, pid: app.processIdentifier)
+                }
+                return
+            }
+        }
+    }
+
     // MARK: High-level
 
     /// Brings a window to the display under the mouse: un-minimizes it, pulls it from another
@@ -60,6 +79,8 @@ enum Actions {
         beginBusy(); defer { endBusy() }
         let target = Screens.current
         let id = AX.windowID(el)
+        let originalFrame = AX.frame(el)
+        log.notice("bringHere id=\(id ?? 0, privacy: .public) pid=\(pid, privacy: .public) from=\(String(describing: originalFrame), privacy: .public) to=\(target.localizedName, privacy: .public)")
         if let id, !isOnScreen(id), AX.bool(el, kAXMinimizedAttribute) != true {
             // On another Space: a minimize/restore round trip re-opens the window on the active Space.
             AX.set(el, kAXMinimizedAttribute, kCFBooleanTrue)
@@ -70,6 +91,11 @@ enum Actions {
             await sleep(350)
         }
         if moveToCurrentDisplay { move(el, to: target) }
+        if let id, let originalFrame, pulled[id] == nil, Screens.screen(for: originalFrame) !== target,
+           AX.frame(el).flatMap(Screens.screen(for:)) === target {
+            pulled[id] = Pull(pid: pid, from: originalFrame, date: Date())
+        }
+        pulled = pulled.filter { Date().timeIntervalSince($0.value.date) < 3600 }
         raise(el, pid: pid)
     }
 
@@ -87,7 +113,7 @@ enum Actions {
         } else if let off = Windows.offSpaceWindows(pid).first, let el = AX.window(pid: pid, id: off.id) {
             await bringHere(el, pid: pid)
         } else {
-            reopen(app)
+            await reopenHere(app)
         }
     }
 
@@ -97,6 +123,7 @@ enum Actions {
     /// at their saved positions. Launches apps that are not running when `launchMissing` is set.
     static func restore(_ snaps: [WindowSnapshot], applyFrames: Bool, launchMissing: Bool) async {
         beginBusy(); defer { endBusy(after: 1200) }
+        log.notice("restore \(snaps.map { "\($0.appName)#\($0.windowID)" }.joined(separator: ","), privacy: .public)")
         var used = Set<CGWindowID>()
         var raised: [(AXUIElement, pid_t)] = []
         for s in snaps.reversed() {

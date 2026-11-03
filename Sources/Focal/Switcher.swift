@@ -54,8 +54,8 @@ final class SwitcherModel: ObservableObject {
         }
 
         contexts.prune()
-        let nowKey = Set(Windows.visibleWindowIDs().map(\.id))
-        for ctx in contexts.history.filter({ $0.key != nowKey }).prefix(6) {
+        let now = Windows.visibleWindowIDs().signature
+        for ctx in contexts.history.filter({ !$0.signature.isSubset(of: now) }).prefix(6) {
             items.append(SwitchItem(id: "c\(ctx.id)", kind: .context(ctx), title: ctx.label, subtitle: ctx.detail,
                                     icon: nil, symbol: "clock.arrow.circlepath", badges: ["попередній набір"]))
         }
@@ -303,7 +303,7 @@ final class SwitcherController: NSObject, NSWindowDelegate {
             case .offSpace(let app):
                 await Actions.summon(app)
             case .noWindows(let app):
-                Actions.reopen(app)
+                await Actions.reopenHere(app, moveToCurrentDisplay: bringHere)
             case .context(let ctx):
                 await model.contexts.restore(ctx)
             case .layout(let layout, _):

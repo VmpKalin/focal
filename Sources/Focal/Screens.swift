@@ -18,6 +18,10 @@ enum Screens {
 
     /// The display the user is working on: the one under the mouse pointer.
     static var current: NSScreen {
+        // Test hook: `defaults write dev.focal.app debugScreen -int N` pins "where I am" to screen N.
+        if let i = UserDefaults.standard.object(forKey: "debugScreen") as? Int, NSScreen.screens.indices.contains(i) {
+            return NSScreen.screens[i]
+        }
         let p = NSEvent.mouseLocation
         return NSScreen.screens.first(where: { NSMouseInRect(p, $0.frame, false) }) ?? NSScreen.main ?? NSScreen.screens[0]
     }

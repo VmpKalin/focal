@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+let log = Logger(subsystem: "dev.focal.app", category: "focal")
 
 /// User preferences (UserDefaults keys shared with the SwiftUI settings via @AppStorage).
 enum Prefs {
