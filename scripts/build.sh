@@ -18,7 +18,7 @@ codesign --force --options runtime --sign "${IDENTITY:--}" "$APP"
 echo "Built $APP (signed with: ${IDENTITY:-ad-hoc})"
 
 if [[ "${1:-}" == "--install" ]]; then
-  pkill -x Focal 2>/dev/null || true
+  pkill -x Focal 2>/dev/null && sleep 1 || true
   mkdir -p ~/Applications
   rm -rf ~/Applications/Focal.app
   cp -R "$APP" ~/Applications/Focal.app
