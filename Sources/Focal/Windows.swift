@@ -1,0 +1,121 @@
+import AppKit
+
+/// A window as reported by the window server.
+struct CGWin {
+    let id: CGWindowID
+    let pid: pid_t
+    let frame: CGRect
+    let isOnScreen: Bool
+}
+
+/// A window snapshot that can be persisted (contexts, layouts).
+struct WindowSnapshot: Codable, Hashable {
+    var windowID: CGWindowID
+    var pid: pid_t
+    var bundleID: String?
+    var appName: String
+    var title: String
+    var frame: CGRect
+}
+
+/// A window the switcher can show.
+struct WindowItem {
+    let id: CGWindowID
+    let pid: pid_t
+    let app: NSRunningApplication
+    let title: String
+    let frame: CGRect
+    let isMinimized: Bool
+    let isOnScreen: Bool
+    let element: AXUIElement
+}
+
+enum Windows {
+    static let ownPID = ProcessInfo.processInfo.processIdentifier
+
+    static func regularApps() -> [NSRunningApplication] {
+        NSWorkspace.shared.runningApplications.filter {
+            $0.activationPolicy == .regular && $0.processIdentifier != ownPID && !$0.isTerminated
+        }
+    }
+
+    /// Normal (layer 0) windows, front to back.
+    static func cgWindows(onScreenOnly: Bool) -> [CGWin] {
+        let opts: CGWindowListOption = onScreenOnly ? [.optionOnScreenOnly, .excludeDesktopElements] : [.optionAll, .excludeDesktopElements]
+        guard let list = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] else { return [] }
+        return list.compactMap { d in
+            guard (d[kCGWindowLayer as String] as? Int) == 0,
+                  let id = d[kCGWindowNumber as String] as? CGWindowID,
+                  let pid = d[kCGWindowOwnerPID as String] as? pid_t, pid != ownPID,
+                  (d[kCGWindowAlpha as String] as? Double ?? 1) > 0.01,
+                  let b = d[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: b as CFDictionary),
+                  frame.width >= 120, frame.height >= 80 else { return nil }
+            return CGWin(id: id, pid: pid, frame: frame, isOnScreen: d[kCGWindowIsOnscreen as String] as? Bool ?? false)
+        }
+    }
+
+    /// Windows the user can actually see right now (not hidden behind others), front to back.
+    static func visibleWindowIDs(minVisibleFraction: CGFloat = 0.2) -> [CGWin] {
+        let screens = NSScreen.screens.map(Screens.fullFrame)
+        var covered: [CGRect] = []
+        var result: [CGWin] = []
+        for w in cgWindows(onScreenOnly: true) {
+            let step = max(16, min(w.frame.width, w.frame.height) / 12)
+            var total = 0, visible = 0
+            var y = w.frame.minY + step / 2
+            while y < w.frame.maxY {
+                var x = w.frame.minX + step / 2
+                while x < w.frame.maxX {
+                    let p = CGPoint(x: x, y: y)
+                    if screens.contains(where: { $0.contains(p) }) {
+                        total += 1
+                        if !covered.contains(where: { $0.contains(p) }) { visible += 1 }
+                    }
+                    x += step
+                }
+                y += step
+            }
+            if total > 0, CGFloat(visible) / CGFloat(total) >= minVisibleFraction { result.append(w) }
+            covered.append(w.frame)
+        }
+        return result
+    }
+
+    /// All switchable windows: everything on the current Spaces (via AX) ordered by recency.
+    static func items() -> [WindowItem] {
+        let zOrder = Dictionary(cgWindows(onScreenOnly: true).enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var items: [WindowItem] = []
+        for app in regularApps() {
+            for el in AX.windows(app.processIdentifier) {
+                guard let id = AX.windowID(el) else { continue }
+                let title = AX.string(el, kAXTitleAttribute) ?? ""
+                items.append(WindowItem(
+                    id: id, pid: app.processIdentifier, app: app,
+                    title: title.isEmpty ? (app.localizedName ?? "") : title,
+                    frame: AX.frame(el) ?? .zero,
+                    isMinimized: AX.bool(el, kAXMinimizedAttribute) ?? false,
+                    isOnScreen: zOrder[id] != nil, element: el))
+            }
+        }
+        return items.sorted { (zOrder[$0.id] ?? Int.max, $0.isMinimized ? 1 : 0) < (zOrder[$1.id] ?? Int.max, $1.isMinimized ? 1 : 0) }
+    }
+
+    /// Big windows of `pid` that the window server knows about but that are not on a visible Space.
+    static func offSpaceWindows(_ pid: pid_t) -> [CGWin] {
+        cgWindows(onScreenOnly: false).filter { $0.pid == pid && !$0.isOnScreen && $0.frame.width >= 250 && $0.frame.height >= 200 }
+    }
+
+    static func snapshot(_ wins: [CGWin]) -> [WindowSnapshot] {
+        var axByPID: [pid_t: [AXUIElement]] = [:]
+        return wins.compactMap { w in
+            let els = axByPID[w.pid] ?? AX.windows(w.pid)
+            axByPID[w.pid] = els
+            guard let el = els.first(where: { AX.windowID($0) == w.id }),
+                  let app = NSRunningApplication(processIdentifier: w.pid) else { return nil }
+            return WindowSnapshot(windowID: w.id, pid: w.pid, bundleID: app.bundleIdentifier,
+                                  appName: app.localizedName ?? "?", title: AX.string(el, kAXTitleAttribute) ?? "",
+                                  frame: w.frame)
+        }
+    }
+}
