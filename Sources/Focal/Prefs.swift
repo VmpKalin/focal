@@ -14,6 +14,7 @@ enum Prefs {
         static let trackContexts = "trackContexts"
         static let contextDwell = "contextDwell"
         static let ignoredApps = "ignoredApps"
+        static let maximizeOnDisplayMove = "maximizeOnDisplayMove"
     }
 
     static func registerDefaults() {
@@ -26,6 +27,7 @@ enum Prefs {
             Key.trackContexts: true,
             Key.contextDwell: 1.5,
             Key.ignoredApps: "com.apple.finder",
+            Key.maximizeOnDisplayMove: true,
         ])
     }
 

@@ -16,6 +16,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.trackContexts) private var trackContexts = true
     @AppStorage(Prefs.Key.contextDwell) private var contextDwell = 1.5
     @AppStorage(Prefs.Key.ignoredApps) private var ignoredApps = "com.apple.finder"
+    @AppStorage(Prefs.Key.maximizeOnDisplayMove) private var maximizeOnDisplayMove = true
 
     @State private var trusted = AX.isTrusted
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -103,6 +104,22 @@ struct SettingsView: View {
                 Text("Збережені набори")
             } footer: {
                 Text("Відновлення запускає потрібні застосунки, розставляє вікна по місцях і піднімає їх нагору. Порядок у списку = ⌃⌥1…9 (перетягни, щоб змінити).")
+            }
+
+            Section {
+                ShortcutRow(keys: "⌃⌥← / →", text: "Ліва / права половина. Ще раз — на сусідній дисплей")
+                ShortcutRow(keys: "⌃⌥↑", text: "Розгорнути на весь екран (з половини — верхня чверть)")
+                ShortcutRow(keys: "⌃⌥↓", text: "Відновити розмір (з половини — нижня чверть), інакше згорнути")
+                ShortcutRow(keys: "⌃⌥⇧← / →", text: "Перекинути на дисплей ліворуч / праворуч")
+                ShortcutRow(keys: "⌃⌥↩", text: "Заповнити екран")
+                ShortcutRow(keys: "⌃⌥⌫", text: "Повернути розмір, який був до прилипання")
+                ShortcutRow(keys: "⌃⌥F", text: "Справжній повноекранний режим macOS (вкл/викл)")
+                ShortcutRow(keys: "⌃⌥C", text: "Поставити по центру")
+                Toggle("При перекиданні на інший дисплей розгортати на весь екран", isOn: $maximizeOnDisplayMove)
+            } header: {
+                Text("Активне вікно (як Win + стрілки у Windows)")
+            } footer: {
+                Text("⌃⌥ замість клавіші Windows: ⌘+стрілки на Mac — це рух курсора по тексту, а ⌥⌘+стрілки перемикають вкладки в браузерах.")
             }
 
             Section("Гарячі клавіші") {

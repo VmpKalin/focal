@@ -38,10 +38,10 @@ enum Actions {
     }
 
     /// Moves a window to `screen` unless it is already there (or is a full-screen window).
-    static func move(_ el: AXUIElement, to screen: NSScreen) {
+    static func move(_ el: AXUIElement, to screen: NSScreen) async {
         guard AX.bool(el, "AXFullScreen") != true, let f = AX.frame(el) else { return }
         if Screens.screen(for: f) === screen { return }
-        AX.setFrame(el, Screens.translate(f, to: screen))
+        await Snap.setFrame(el, Screens.translate(f, to: screen))
     }
 
     static func isOnScreen(_ id: CGWindowID) -> Bool {
@@ -90,7 +90,7 @@ enum Actions {
             AX.set(el, kAXMinimizedAttribute, kCFBooleanFalse)
             await sleep(350)
         }
-        if moveToCurrentDisplay { move(el, to: target) }
+        if moveToCurrentDisplay { await move(el, to: target) }
         if let id, let originalFrame, pulled[id] == nil, Screens.screen(for: originalFrame) !== target,
            AX.frame(el).flatMap(Screens.screen(for:)) === target {
             pulled[id] = Pull(pid: pid, from: originalFrame, date: Date())
@@ -137,7 +137,7 @@ enum Actions {
             }
             if applyFrames, let f = AX.frame(el), Screens.screen(for: s.frame) != nil,
                abs(f.minX - s.frame.minX) + abs(f.minY - s.frame.minY) + abs(f.width - s.frame.width) + abs(f.height - s.frame.height) > 4 {
-                AX.setFrame(el, s.frame)
+                await Snap.setFrame(el, s.frame)
             }
             raise(el, pid: pid)
             raised.append((el, pid))

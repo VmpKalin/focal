@@ -42,6 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         reg(.back) { [weak self] in self?.goBack() }
         reg(.summon) { Task { await Actions.summonFrontmost() } }
         reg(.saveLayout) { [weak self] in self?.layouts.promptAndSaveCurrent() }
+        for a in SnapAction.allCases {
+            reg(.snap(a)) { Task { await Snap.perform(a) } }
+        }
         for i in 0..<9 {
             reg(.layout(i)) { [weak self] in Task { await self?.layouts.restore(at: i) } }
         }
@@ -65,6 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case "layout": Task { await layouts.restore(at: (Int(q.first { $0.name == "n" }?.value ?? "") ?? 0) - 1) }
             case "settings": showSettings()
             case "dump": dump()
+            case "snap":
+                if let a = q.first(where: { $0.name == "to" })?.value.flatMap(SnapAction.init(rawValue:)) {
+                    Task { await Snap.perform(a) }
+                }
             case "focus":
                 if let id = q.first(where: { $0.name == "id" })?.value.flatMap(CGWindowID.init),
                    let w = Windows.items().first(where: { $0.id == id }) {
@@ -108,6 +115,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Перемикач вікон", key: "⌥Space") { [weak self] in self?.switcher.show() })
         menu.addItem(item("Назад до попереднього набору", key: "⌥`") { [weak self] in self?.goBack() })
         menu.addItem(item("Притягнути активне вікно сюди", key: "⌥⇧Space") { Task { await Actions.summonFrontmost() } })
+        let windowMenu = NSMenu()
+        let names: [(SnapAction, String)] = [
+            (.left, "Ліва половина"), (.right, "Права половина"), (.up, "Розгорнути / верхня чверть"),
+            (.down, "Відновити / нижня чверть / згорнути"), (.maximize, "Заповнити екран"), (.center, "По центру"),
+            (.restore, "Попередній розмір"), (.fullscreen, "Повноекранний режим"),
+            (.displayLeft, "На дисплей ліворуч"), (.displayRight, "На дисплей праворуч"),
+        ]
+        for (a, title) in names {
+            // Runs after the menu closes, so the user's app is frontmost again.
+            windowMenu.addItem(item(title, key: HotKeys.Combo.snap(a).display) { Task { try? await Task.sleep(nanoseconds: 150_000_000); await Snap.perform(a) } })
+        }
+        let windowItem = NSMenuItem(title: "Активне вікно", action: nil, keyEquivalent: "")
+        windowItem.submenu = windowMenu
+        menu.addItem(windowItem)
         menu.addItem(.separator())
 
         let recent = NSMenu()

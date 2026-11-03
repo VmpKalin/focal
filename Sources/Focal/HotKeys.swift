@@ -48,6 +48,22 @@ extension HotKeys.Combo {
     static let summon = Self(keyCode: kVK_Space, modifiers: optionKey | shiftKey, display: "⌥⇧Space")
     static let saveLayout = Self(keyCode: kVK_ANSI_S, modifiers: controlKey | optionKey, display: "⌃⌥S")
 
+    static func snap(_ a: SnapAction) -> Self {
+        let co = controlKey | optionKey
+        switch a {
+        case .left: return Self(keyCode: kVK_LeftArrow, modifiers: co, display: "⌃⌥←")
+        case .right: return Self(keyCode: kVK_RightArrow, modifiers: co, display: "⌃⌥→")
+        case .up: return Self(keyCode: kVK_UpArrow, modifiers: co, display: "⌃⌥↑")
+        case .down: return Self(keyCode: kVK_DownArrow, modifiers: co, display: "⌃⌥↓")
+        case .displayLeft: return Self(keyCode: kVK_LeftArrow, modifiers: co | shiftKey, display: "⌃⌥⇧←")
+        case .displayRight: return Self(keyCode: kVK_RightArrow, modifiers: co | shiftKey, display: "⌃⌥⇧→")
+        case .fullscreen: return Self(keyCode: kVK_ANSI_F, modifiers: co, display: "⌃⌥F")
+        case .center: return Self(keyCode: kVK_ANSI_C, modifiers: co, display: "⌃⌥C")
+        case .maximize: return Self(keyCode: kVK_Return, modifiers: co, display: "⌃⌥↩")
+        case .restore: return Self(keyCode: kVK_Delete, modifiers: co, display: "⌃⌥⌫")
+        }
+    }
+
     static let digitKeys = [kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3, kVK_ANSI_4, kVK_ANSI_5,
                             kVK_ANSI_6, kVK_ANSI_7, kVK_ANSI_8, kVK_ANSI_9]
     static func layout(_ n: Int) -> Self {

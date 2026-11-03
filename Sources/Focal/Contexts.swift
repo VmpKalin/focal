@@ -121,7 +121,7 @@ final class ContextTracker: ObservableObject {
         for (id, pull) in Actions.pulled where pull.date >= ctx.date.addingTimeInterval(-1) || ctx.key.contains(id) {
             Actions.pulled[id] = nil
             guard !ctx.key.contains(id), let el = AX.window(pid: pull.pid, id: id) else { continue }
-            AX.setFrame(el, pull.from)
+            await Snap.setFrame(el, pull.from)
         }
         await Actions.restore(ctx.windows, applyFrames: true, launchMissing: false)
         // Make the restored context the most recent immediately, so pressing ⌥` again toggles back.
