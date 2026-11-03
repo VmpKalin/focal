@@ -40,6 +40,20 @@ enum Windows {
         }
     }
 
+    /// Apps whose windows the switcher lists: regular apps, plus menu-bar ("accessory") apps that
+    /// currently own a real window — Docker Desktop, for example, registers as an accessory app.
+    /// System UI agents (AutoFill, Control Centre, input helpers...) are left out.
+    static func windowOwningApps(_ big: [pid_t: [CGWin]]) -> [NSRunningApplication] {
+        NSWorkspace.shared.runningApplications.filter { app in
+            guard app.processIdentifier != ownPID, !app.isTerminated else { return false }
+            switch app.activationPolicy {
+            case .regular: return true
+            case .accessory: return !(app.bundleIdentifier ?? "").hasPrefix("com.apple.") && big[app.processIdentifier] != nil
+            default: return false
+            }
+        }
+    }
+
     /// Normal (layer 0) windows, front to back.
     static func cgWindows(onScreenOnly: Bool) -> [CGWin] {
         let opts: CGWindowListOption = onScreenOnly ? [.optionOnScreenOnly, .excludeDesktopElements] : [.optionAll, .excludeDesktopElements]
@@ -93,7 +107,7 @@ enum Windows {
         let zOrder = Dictionary(cgWindows(onScreenOnly: true).enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
         let bigByPID = Dictionary(grouping: cgWindows(onScreenOnly: false).filter { $0.frame.width >= 250 && $0.frame.height >= 200 }, by: \.pid)
         var items: [WindowItem] = []
-        for app in regularApps() {
+        for app in windowOwningApps(bigByPID) {
             var els = AX.windows(app.processIdentifier)
             let known = Set(els.compactMap(AX.windowID))
             let missing = Set((bigByPID[app.processIdentifier] ?? []).map(\.id)).subtracting(known)
