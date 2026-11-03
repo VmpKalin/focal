@@ -40,8 +40,14 @@ final class ContextTracker: ObservableObject {
     @Published private(set) var history: [WindowContext] = []
     private var timer: Timer?
     private var candidate: (key: Set<WinSig>, since: Date)?
+    /// While stepping with back/forward: the history index on screen now. History is not
+    /// reordered during navigation, like a browser; doing something new ends it.
+    @Published private(set) var navIndex: Int?
     private let maxHistory = 25
     private let url = Prefs.supportDirectory.appendingPathComponent("contexts.json")
+
+    /// In-memory tracker that is never started or saved (README screenshots).
+    static func demo() -> ContextTracker { ContextTracker() }
 
     func start() {
         if let data = try? Data(contentsOf: url), let saved = try? JSONDecoder().decode([WindowContext].self, from: data) {
@@ -57,6 +63,10 @@ final class ContextTracker: ObservableObject {
         let visible = Windows.visibleWindowIDs()
         let key = visible.signature
         guard !key.isEmpty else { return }
+        if let n = navIndex {
+            if history.indices.contains(n), history[n].signature.isSubset(of: key) { return }
+            navIndex = nil
+        }
         if candidate?.key != key { candidate = (key, Date()); return }
         guard let c = candidate, Date().timeIntervalSince(c.since) >= Prefs.contextDwell else { return }
         if let top = history.first, top.signature == key {
@@ -107,24 +117,66 @@ final class ContextTracker: ObservableObject {
         commit(visible)
     }
 
-    func goBack() async {
-        captureNow()
-        prune()
-        guard let ctx = previous else { NSSound.beep(); return }
-        log.notice("back -> \(ctx.label, privacy: .public) \(ctx.windows.map { "\($0.windowID)@\(Int($0.frame.minX))" }.joined(separator: ","), privacy: .public)")
-        await restore(ctx)
+    /// Index we are viewing via back/forward, if the screen still shows it.
+    private var stillNavigating: Int? {
+        guard let n = navIndex, history.indices.contains(n),
+              history[n].signature.isSubset(of: Windows.visibleWindowIDs().signature) else { return nil }
+        return n
     }
 
-    func restore(_ ctx: WindowContext) async {
-        captureNow()
-        // Send windows Focal pulled over since then back to where they were.
+    /// ⌥`: one step back in history (keeps going further on repeated presses).
+    func goBack() async {
+        let from: Int
+        if let n = stillNavigating {
+            from = n + 1
+        } else {
+            navIndex = nil
+            captureNow()
+            prune()
+            from = 0
+        }
+        let now = Windows.visibleWindowIDs().signature
+        guard let i = history.indices.dropFirst(from).first(where: { !history[$0].signature.isSubset(of: now) }) else {
+            NSSound.beep(); return
+        }
+        log.notice("back -> #\(i, privacy: .public) \(self.history[i].label, privacy: .public)")
+        await navigate(to: i)
+    }
+
+    /// ⌥⇧`: one step forward, back towards the most recent set.
+    func goForward() async {
+        guard let n = stillNavigating, n > 0 else { NSSound.beep(); return }
+        let now = Windows.visibleWindowIDs().signature
+        let i = (0..<n).reversed().first(where: { !history[$0].signature.isSubset(of: now) }) ?? 0
+        log.notice("forward -> #\(i, privacy: .public) \(self.history[i].label, privacy: .public)")
+        await navigate(to: i)
+    }
+
+    var canGoForward: Bool { (stillNavigating ?? 0) > 0 }
+
+    private func navigate(to i: Int) async {
+        let ctx = history[i]
+        await undoPulls(since: ctx)
+        await Actions.restore(ctx.windows, applyFrames: true, launchMissing: false)
+        candidate = nil
+        navIndex = i
+    }
+
+    /// Sends windows Focal pulled over since `ctx` was on screen back to where they were.
+    private func undoPulls(since ctx: WindowContext) async {
         for (id, pull) in Actions.pulled where pull.date >= ctx.date.addingTimeInterval(-1) || ctx.key.contains(id) {
             Actions.pulled[id] = nil
             guard !ctx.key.contains(id), let el = AX.window(pid: pull.pid, id: id) else { continue }
             await Snap.setFrame(el, pull.from)
         }
+    }
+
+    /// Opening a specific set (switcher, menu) makes it the most recent one.
+    func restore(_ ctx: WindowContext) async {
+        navIndex = nil
+        captureNow()
+        await undoPulls(since: ctx)
         await Actions.restore(ctx.windows, applyFrames: true, launchMissing: false)
-        // Make the restored context the most recent immediately, so pressing ⌥` again toggles back.
         candidate = nil
         let current = history.first
         history.removeAll { $0.id == ctx.id }
@@ -138,5 +190,5 @@ final class ContextTracker: ObservableObject {
         save()
     }
 
-    func clear() { history.removeAll(); save() }
+    func clear() { history.removeAll(); navIndex = nil; save() }
 }

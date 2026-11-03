@@ -26,6 +26,24 @@ enum Screens {
         return NSScreen.screens.first(where: { NSMouseInRect(p, $0.frame, false) }) ?? NSScreen.main ?? NSScreen.screens[0]
     }
 
+    /// True when the display is showing a full-screen app (its own Space). Ordinary windows cannot
+    /// be placed over it: moving one "there" puts it on that display's hidden desktop instead.
+    static func isShowingFullScreen(_ s: NSScreen) -> Bool {
+        let full = fullFrame(s)
+        return Windows.cgWindows(onScreenOnly: true).contains { w in
+            abs(w.frame.minX - full.minX) <= 1 && abs(w.frame.minY - full.minY) <= 1
+                && abs(w.frame.width - full.width) <= 1 && abs(w.frame.height - full.height) <= 1
+        }
+    }
+
+    /// Where pulled windows should go: the display I am on, unless it shows a full-screen app;
+    /// then another display that does not; nil if every display is in full screen.
+    static var pullTarget: NSScreen? {
+        let here = current
+        if !isShowingFullScreen(here) { return here }
+        return NSScreen.screens.first { $0 !== here && !isShowingFullScreen($0) }
+    }
+
     /// The display that holds most of `rect`, or nil if the rect is off every display.
     static func screen(for rect: CGRect) -> NSScreen? {
         var best: (NSScreen, CGFloat)?

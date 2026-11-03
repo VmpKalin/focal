@@ -15,6 +15,7 @@ enum Prefs {
         static let contextDwell = "contextDwell"
         static let ignoredApps = "ignoredApps"
         static let maximizeOnDisplayMove = "maximizeOnDisplayMove"
+        static let switcherStyle = "switcherStyle"
     }
 
     static func registerDefaults() {
@@ -28,6 +29,7 @@ enum Prefs {
             Key.contextDwell: 1.5,
             Key.ignoredApps: "com.apple.finder",
             Key.maximizeOnDisplayMove: true,
+            Key.switcherStyle: "list",
         ])
     }
 

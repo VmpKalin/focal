@@ -27,6 +27,7 @@ struct WindowItem {
     let frame: CGRect
     let isMinimized: Bool
     let isOnScreen: Bool
+    let isFullScreen: Bool
     let element: AXUIElement
 }
 
@@ -82,12 +83,24 @@ enum Windows {
         return result
     }
 
-    /// All switchable windows: everything on the current Spaces (via AX) ordered by recency.
+    /// All switchable windows on every Space, ordered by recency.
+    ///
+    /// kAXWindows only reports windows on the Spaces currently shown, so windows on other desktops
+    /// and in full screen (which is its own Space) are invisible to it, exactly like in App Exposé.
+    /// For apps where the window server knows more windows than AX reports, the remaining ones are
+    /// found by enumerating AX element tokens (~30 ms per app, only done for those apps).
     static func items() -> [WindowItem] {
         let zOrder = Dictionary(cgWindows(onScreenOnly: true).enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let bigByPID = Dictionary(grouping: cgWindows(onScreenOnly: false).filter { $0.frame.width >= 250 && $0.frame.height >= 200 }, by: \.pid)
         var items: [WindowItem] = []
         for app in regularApps() {
-            for el in AX.windows(app.processIdentifier) {
+            var els = AX.windows(app.processIdentifier)
+            let known = Set(els.compactMap(AX.windowID))
+            let missing = Set((bigByPID[app.processIdentifier] ?? []).map(\.id)).subtracting(known)
+            if !missing.isEmpty {
+                els += AX.bruteForceWindows(app.processIdentifier).filter { AX.windowID($0).map(missing.contains) ?? false }
+            }
+            for el in els {
                 guard let id = AX.windowID(el) else { continue }
                 let title = AX.string(el, kAXTitleAttribute) ?? ""
                 items.append(WindowItem(
@@ -95,7 +108,7 @@ enum Windows {
                     title: title.isEmpty ? (app.localizedName ?? "") : title,
                     frame: AX.frame(el) ?? .zero,
                     isMinimized: AX.bool(el, kAXMinimizedAttribute) ?? false,
-                    isOnScreen: zOrder[id] != nil, element: el))
+                    isOnScreen: zOrder[id] != nil, isFullScreen: AX.bool(el, "AXFullScreen") ?? false, element: el))
             }
         }
         return items.sorted { (zOrder[$0.id] ?? Int.max, $0.isMinimized ? 1 : 0) < (zOrder[$1.id] ?? Int.max, $1.isMinimized ? 1 : 0) }

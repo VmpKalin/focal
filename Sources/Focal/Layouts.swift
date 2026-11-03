@@ -12,6 +12,13 @@ struct Layout: Codable, Identifiable, Hashable {
 final class LayoutStore: ObservableObject {
     @Published private(set) var layouts: [Layout] = []
     private let url = Prefs.supportDirectory.appendingPathComponent("layouts.json")
+    private var persistent = true
+
+    /// In-memory store with fixed layouts (README screenshots); never touches disk.
+    init(demo: [Layout]) {
+        layouts = demo
+        persistent = false
+    }
 
     init() {
         if let data = try? Data(contentsOf: url), let saved = try? JSONDecoder().decode([Layout].self, from: data) {
@@ -20,6 +27,7 @@ final class LayoutStore: ObservableObject {
     }
 
     private func save() {
+        guard persistent else { return }
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted]
         if let data = try? enc.encode(layouts) { try? data.write(to: url) }

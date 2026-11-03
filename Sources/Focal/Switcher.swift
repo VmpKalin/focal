@@ -19,8 +19,25 @@ struct SwitchItem: Identifiable {
     let icon: NSImage?
     let symbol: String?
     let badges: [String]
+    /// Fixed preview image (demo renders); live windows use Thumbnails instead.
+    var preview: NSImage? = nil
 
     var searchable: String { "\(title) \(subtitle)" }
+
+    var windowID: CGWindowID? {
+        if case .window(let w) = kind { return w.id }
+        return nil
+    }
+}
+
+enum SwitcherStyle: String {
+    case list, grid
+
+    static var current: SwitcherStyle { SwitcherStyle(rawValue: UserDefaults.standard.string(forKey: Prefs.Key.switcherStyle) ?? "") ?? .list }
+
+    var size: NSSize { self == .list ? NSSize(width: 680, height: 460) : NSSize(width: 980, height: 640) }
+    /// Cards per row in the grid; arrow ↑/↓ moves by this much.
+    static let gridColumns = 4
 }
 
 @MainActor
@@ -29,6 +46,9 @@ final class SwitcherModel: ObservableObject {
     @Published private(set) var visible: [SwitchItem] = []
     @Published var selection = 0
     @Published var focusToken = UUID()
+    @Published private(set) var style = SwitcherStyle.current
+    @Published private(set) var isDemo = false
+    let thumbnails = Thumbnails()
 
     private var all: [SwitchItem] = []
     let contexts: ContextTracker
@@ -41,12 +61,14 @@ final class SwitcherModel: ObservableObject {
 
     func reload() {
         query = ""
+        style = SwitcherStyle.current
         let here = Screens.current
         let windows = Windows.items()
         var items: [SwitchItem] = windows.map { w in
             var badges: [String] = []
+            if w.isFullScreen { badges.append("повний екран") }
             if w.isMinimized { badges.append("згорнуте") }
-            else if !w.isOnScreen { badges.append("сховане") }
+            else if !w.isOnScreen { badges.append(w.isFullScreen ? "окремий Space" : "інший робочий стіл") }
             else if let s = Screens.screen(for: w.frame), s !== here { badges.append(s.localizedName) }
             else if Screens.screen(for: w.frame) == nil { badges.append("за межами екрана") }
             return SwitchItem(id: "w\(w.id)", kind: .window(w), title: w.title,
@@ -64,12 +86,16 @@ final class SwitcherModel: ObservableObject {
                                     subtitle: layout.windows.map(\.appName).joined(separator: " + "),
                                     icon: nil, symbol: "square.grid.2x2", badges: i < 9 ? ["⌃⌥\(i + 1)"] : []))
         }
+        // Windows.items() already includes other Spaces, so apps left here really have no windows.
         let withWindows = Set(windows.map(\.pid))
         for app in Windows.regularApps() where !withWindows.contains(app.processIdentifier) {
-            let hasOff = !Windows.offSpaceWindows(app.processIdentifier).isEmpty
-            items.append(SwitchItem(id: "a\(app.processIdentifier)", kind: hasOff ? .offSpace(app) : .noWindows(app),
-                                    title: app.localizedName ?? "?", subtitle: hasOff ? "вікна на іншому робочому столі (Space)" : "немає відкритих вікон",
-                                    icon: app.icon, symbol: nil, badges: [hasOff ? "інший Space" : "нове вікно"]))
+            items.append(SwitchItem(id: "a\(app.processIdentifier)", kind: .noWindows(app),
+                                    title: app.localizedName ?? "?", subtitle: "немає відкритих вікон",
+                                    icon: app.icon, symbol: nil, badges: ["нове вікно"]))
+        }
+        if style == .grid {
+            thumbnails.forget(except: Set(windows.map(\.id)))
+            thumbnails.load(windows.map(\.id))
         }
         all = items
         refilter()
@@ -114,8 +140,25 @@ final class SwitcherModel: ObservableObject {
         return max(1, 500 - gaps)
     }
 
+    /// Shows fixed items instead of live windows (README screenshots).
+    func showDemo(_ items: [SwitchItem], style: SwitcherStyle, query: String = "", selection: Int = 0) {
+        self.style = style
+        isDemo = true
+        all = items
+        visible = items
+        self.query = query
+        if !query.isEmpty { visible = items }
+        self.selection = selection
+    }
+
     func move(_ delta: Int) {
         guard !visible.isEmpty else { return }
+        if abs(delta) > 1 {
+            // Grid rows: stop at the edges instead of wrapping into another column.
+            let next = selection + delta
+            if visible.indices.contains(next) { selection = next }
+            return
+        }
         selection = (selection + delta + visible.count) % visible.count
     }
 
@@ -126,6 +169,7 @@ final class SwitcherModel: ObservableObject {
 
 struct SwitcherView: View {
     @ObservedObject var model: SwitcherModel
+    @ObservedObject var thumbs: Thumbnails
     var onActivate: (SwitchItem) -> Void
     @FocusState private var fieldFocused: Bool
 
@@ -142,15 +186,36 @@ struct SwitcherView: View {
             Divider()
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(Array(model.visible.enumerated()), id: \.element.id) { i, item in
-                            Row(item: item, selected: i == model.selection)
-                                .id(item.id)
-                                .contentShape(Rectangle())
-                                .onTapGesture { model.selection = i; onActivate(item) }
+                    if model.style == .grid {
+                        if !Thumbnails.hasPermission && !model.isDemo {
+                            HStack {
+                                Image(systemName: "eye.slash")
+                                Text("Щоб бачити вміст вікон, дозволь Focal «Запис екрана».")
+                                Spacer()
+                                Button("Дозволити…") { Thumbnails.requestPermission() }
+                            }
+                            .font(.system(size: 12)).padding(.horizontal, 14).padding(.top, 10)
                         }
+                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(224), spacing: 12), count: SwitcherStyle.gridColumns), spacing: 12) {
+                            ForEach(Array(model.visible.enumerated()), id: \.element.id) { i, item in
+                                Card(item: item, image: item.preview ?? item.windowID.flatMap { thumbs.images[$0] }, selected: i == model.selection)
+                                    .id(item.id)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { model.selection = i; onActivate(item) }
+                            }
+                        }
+                        .padding(12)
+                    } else {
+                        LazyVStack(spacing: 2) {
+                            ForEach(Array(model.visible.enumerated()), id: \.element.id) { i, item in
+                                Row(item: item, selected: i == model.selection)
+                                    .id(item.id)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { model.selection = i; onActivate(item) }
+                            }
+                        }
+                        .padding(6)
                     }
-                    .padding(6)
                 }
                 .onChange(of: model.selection) { _, new in
                     if model.visible.indices.contains(new) { proxy.scrollTo(model.visible[new].id) }
@@ -165,12 +230,56 @@ struct SwitcherView: View {
                 .font(.system(size: 11)).foregroundStyle(.secondary)
                 .padding(.vertical, 7)
         }
-        .frame(width: 680, height: 460)
+        .frame(width: model.style.size.width, height: model.style.size.height)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.12)))
         .onChange(of: model.focusToken) { _, _ in fieldFocused = true }
         .onAppear { fieldFocused = true }
+    }
+
+    /// A grid card: live preview of the window (or the app icon), title and badges.
+    struct Card: View {
+        let item: SwitchItem
+        let image: NSImage?
+        let selected: Bool
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.25))
+                    if let image {
+                        Image(nsImage: image).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 6)).padding(4)
+                    } else if let icon = item.icon {
+                        Image(nsImage: icon).resizable().frame(width: 64, height: 64).opacity(0.9)
+                    } else {
+                        Image(systemName: item.symbol ?? "macwindow").font(.system(size: 40)).foregroundStyle(Color.accentColor)
+                    }
+                    if image != nil, let icon = item.icon {
+                        Image(nsImage: icon).resizable().frame(width: 30, height: 30)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing).padding(6)
+                    }
+                }
+                .frame(width: 216, height: 136)
+                HStack(spacing: 4) {
+                    Text(item.title).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 4) {
+                    Text(item.subtitle).font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
+                    Spacer(minLength: 0)
+                    if let b = item.badges.first {
+                        Text(b).font(.system(size: 9.5, weight: .medium)).lineLimit(1)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Capsule().fill(Color.secondary.opacity(0.2)))
+                    }
+                }
+            }
+            .padding(4)
+            .background(RoundedRectangle(cornerRadius: 11).fill(selected ? Color.accentColor.opacity(0.25) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2.5))
+            .help(item.title)
+        }
     }
 
     struct Row: View {
@@ -232,6 +341,7 @@ final class SwitcherController: NSObject, NSWindowDelegate {
         model.reload()
         let panel = self.panel ?? makePanel()
         self.panel = panel
+        panel.setContentSize(model.style.size)
         let screen = Screens.current.frame
         let size = panel.frame.size
         panel.setFrameOrigin(NSPoint(x: screen.midX - size.width / 2, y: screen.maxY - screen.height * 0.22 - size.height))
@@ -267,7 +377,7 @@ final class SwitcherController: NSObject, NSWindowDelegate {
         p.hasShadow = true
         p.hidesOnDeactivate = false
         p.delegate = self
-        p.contentView = NSHostingView(rootView: SwitcherView(model: model) { [weak self] item in
+        p.contentView = NSHostingView(rootView: SwitcherView(model: model, thumbs: model.thumbnails) { [weak self] item in
             self?.activate(item, flipPlacement: false)
         })
         return p
@@ -277,8 +387,10 @@ final class SwitcherController: NSObject, NSWindowDelegate {
         guard isShown, e.window === panel else { return e }
         let cmd = e.modifierFlags.contains(.command)
         switch Int(e.keyCode) {
-        case 125: model.move(1)                                  // ↓
-        case 126: model.move(-1)                                 // ↑
+        case 125: model.move(model.style == .grid ? SwitcherStyle.gridColumns : 1)   // ↓
+        case 126: model.move(model.style == .grid ? -SwitcherStyle.gridColumns : -1) // ↑
+        case 123 where model.style == .grid: model.move(-1)     // ←
+        case 124 where model.style == .grid: model.move(1)      // →
         case 48: model.move(e.modifierFlags.contains(.shift) ? -1 : 1) // tab
         case 36, 76: if let s = model.selected { activate(s, flipPlacement: cmd) } // return
         case 53: hide()                                          // esc

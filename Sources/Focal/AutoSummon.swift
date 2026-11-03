@@ -37,7 +37,9 @@ final class AutoSummon {
 
     private func fix(_ app: NSRunningApplication) async {
         let pid = app.processIdentifier
-        let here = Screens.current
+        // When I am looking at a full-screen app, a window cannot come "here"; Focal uses
+        // another display, or leaves it to macOS when every display is in full screen.
+        guard let here = Screens.pullTarget else { return }
         let onScreen = Windows.cgWindows(onScreenOnly: true).filter { $0.pid == pid }
         let axApp = AX.app(pid)
         let focused = AX.element(axApp, kAXFocusedWindowAttribute) ?? AX.element(axApp, kAXMainWindowAttribute)

@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "rectangle.stack", accessibilityDescription: "Focal")
         let menu = NSMenu()
+        menu.autoenablesItems = false
         menu.delegate = self
         statusItem.menu = menu
 
@@ -40,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         reg(.switcher) { [weak self] in self?.switcher.toggle() }
         reg(.back) { [weak self] in self?.goBack() }
+        reg(.forward) { [weak self] in self?.goForward() }
         reg(.summon) { Task { await Actions.summonFrontmost() } }
         reg(.saveLayout) { [weak self] in self?.layouts.promptAndSaveCurrent() }
         for a in SnapAction.allCases {
@@ -55,6 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Task { await contexts.goBack() }
     }
 
+    private func goForward() {
+        guard AX.isTrusted else { showSettings(); return }
+        Task { await contexts.goForward() }
+    }
+
     // MARK: URL scheme (Shortcuts, Raycast, scripts): focal://switcher, back, summon, save?name=X, layout?n=1, dump
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -63,11 +70,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             switch url.host {
             case "switcher": switcher.toggle()
             case "back": goBack()
+            case "forward": goForward()
             case "summon": Task { await Actions.summonFrontmost() }
             case "save": _ = layouts.saveCurrent(named: q.first { $0.name == "name" }?.value ?? "Набір \(layouts.layouts.count + 1)")
             case "layout": Task { await layouts.restore(at: (Int(q.first { $0.name == "n" }?.value ?? "") ?? 0) - 1) }
             case "settings": showSettings()
             case "dump": dump()
+            case "render-docs":
+                if let dir = q.first(where: { $0.name == "dir" })?.value {
+                    DocsRender.renderAll(to: URL(fileURLWithPath: dir))
+                }
+            case "inspect": inspect(bundleID: q.first { $0.name == "app" }?.value ?? "com.google.Chrome")
             case "snap":
                 if let a = q.first(where: { $0.name == "to" })?.value.flatMap(SnapAction.init(rawValue:)) {
                     Task { await Snap.perform(a) }
@@ -94,6 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                  "frame": [w.frame.minX, w.frame.minY, w.frame.width, w.frame.height]] as [String: Any]
             },
             "visible": Windows.visibleWindowIDs().map(\.id),
+            "navIndex": contexts.navIndex ?? -1,
             "contexts": contexts.history.map { ["label": $0.label, "ids": $0.windows.map(\.windowID)] as [String: Any] },
             "layouts": layouts.layouts.map(\.name),
             "failedHotKeys": failedHotKeys,
@@ -102,6 +116,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: url)
         }
+    }
+
+    /// Everything macOS reports about one app's windows (debugging "missing window" reports).
+    private func inspect(bundleID: String) {
+        var out: [[String: Any]] = []
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleID) {
+            let pid = app.processIdentifier
+            func ax(_ el: AXUIElement) -> [String: Any] {
+                ["id": AX.windowID(el) ?? 0, "title": AX.string(el, kAXTitleAttribute) ?? "",
+                 "subrole": AX.string(el, kAXSubroleAttribute) ?? "", "minimized": AX.bool(el, kAXMinimizedAttribute) ?? false,
+                 "fullscreen": AX.bool(el, "AXFullScreen") ?? false,
+                 "frame": AX.frame(el).map { [$0.minX, $0.minY, $0.width, $0.height] } ?? []]
+            }
+            let list = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
+            let cg = list.filter { ($0[kCGWindowOwnerPID as String] as? pid_t) == pid }.map { d -> [String: Any] in
+                ["id": d[kCGWindowNumber as String] ?? 0, "layer": d[kCGWindowLayer as String] ?? 0,
+                 "onScreen": d[kCGWindowIsOnscreen as String] ?? false, "alpha": d[kCGWindowAlpha as String] ?? 0,
+                 "bounds": d[kCGWindowBounds as String] ?? [:]]
+            }
+            let axRaw = (AX.value(AX.app(pid), kAXWindowsAttribute) as? [AXUIElement] ?? []).map(ax)
+            let t0 = Date()
+            let brute = AX.bruteForceWindows(pid).map(ax)
+            out.append(["pid": pid, "cgWindows": cg, "axWindows": axRaw, "bruteForce": brute,
+                        "bruteForceMs": Int(Date().timeIntervalSince(t0) * 1000)])
+        }
+        let url = Prefs.supportDirectory.appendingPathComponent("inspect.json")
+        if let data = try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: url) }
     }
 
     // MARK: Menu
@@ -114,6 +155,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         menu.addItem(item("Перемикач вікон", key: "⌥Space") { [weak self] in self?.switcher.show() })
         menu.addItem(item("Назад до попереднього набору", key: "⌥`") { [weak self] in self?.goBack() })
+        let fwd = item("Вперед до наступного набору", key: "⌥⇧`") { [weak self] in self?.goForward() }
+        fwd.isEnabled = contexts.canGoForward
+        menu.addItem(fwd)
         menu.addItem(item("Притягнути активне вікно сюди", key: "⌥⇧Space") { Task { await Actions.summonFrontmost() } })
         let windowMenu = NSMenu()
         let names: [(SnapAction, String)] = [

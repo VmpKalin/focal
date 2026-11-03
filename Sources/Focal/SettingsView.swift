@@ -17,6 +17,8 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.contextDwell) private var contextDwell = 1.5
     @AppStorage(Prefs.Key.ignoredApps) private var ignoredApps = "com.apple.finder"
     @AppStorage(Prefs.Key.maximizeOnDisplayMove) private var maximizeOnDisplayMove = true
+    @AppStorage(Prefs.Key.switcherStyle) private var switcherStyle = "list"
+    @State private var canRecord = Thumbnails.hasPermission
 
     @State private var trusted = AX.isTrusted
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -62,7 +64,8 @@ struct SettingsView: View {
                 .padding(.leading, 16)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Не чіпати ці застосунки (bundle id через кому)")
-                    TextField("com.apple.finder, com.example.app", text: $ignoredApps)
+                    TextField("", text: $ignoredApps, prompt: Text("com.apple.finder, com.example.app"))
+                        .labelsHidden()
                 }
             } header: {
                 Text("Вікна приходять до тебе")
@@ -71,6 +74,19 @@ struct SettingsView: View {
             }
 
             Section {
+                Picker("Вигляд перемикача", selection: $switcherStyle) {
+                    Text("Список").tag("list")
+                    Text("Мініатюри вікон").tag("grid")
+                }
+                .pickerStyle(.segmented)
+                if switcherStyle == "grid" {
+                    HStack {
+                        Image(systemName: canRecord ? "checkmark.seal.fill" : "eye.slash").foregroundStyle(canRecord ? .green : .orange)
+                        Text(canRecord ? "Мініатюри показують, що зараз у вікні" : "Для вмісту вікон потрібен дозвіл «Запис екрана» (без нього — іконки)")
+                        Spacer()
+                        if !canRecord { Button("Дозволити…") { Thumbnails.requestPermission() } }
+                    }
+                }
                 Toggle("↩ у перемикачі переносить вікно на мій дисплей", isOn: $switcherBringsHere)
                 Toggle("Запам'ятовувати набори вікон, які я переглядаю разом", isOn: $trackContexts)
                 HStack {
@@ -124,7 +140,8 @@ struct SettingsView: View {
 
             Section("Гарячі клавіші") {
                 ShortcutRow(keys: "⌥Space", text: "Перемикач: усі вікна, набори і застосунки з пошуком")
-                ShortcutRow(keys: "⌥`", text: "Назад до попереднього набору вікон (ще раз — повернутись)")
+                ShortcutRow(keys: "⌥`", text: "Назад до попереднього набору вікон (ще раз — ще далі назад)")
+                ShortcutRow(keys: "⌥⇧`", text: "Вперед — назад до поточного набору")
                 ShortcutRow(keys: "⌥⇧Space", text: "Притягнути вікно активного застосунку на мій дисплей")
                 ShortcutRow(keys: "⌃⌥S", text: "Зберегти поточний набір вікон")
                 ShortcutRow(keys: "⌃⌥1…9", text: "Відновити збережений набір")
@@ -169,6 +186,7 @@ struct SettingsView: View {
         .frame(width: 600, height: 760)
         .onReceive(tick) { _ in
             trusted = AX.isTrusted
+            canRecord = Thumbnails.hasPermission
             diag = MacSettings.read()
         }
     }

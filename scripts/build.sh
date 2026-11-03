@@ -12,6 +12,7 @@ STAGE=$(mktemp -d)/Focal.app
 mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources"
 cp .build/release/Focal "$STAGE/Contents/MacOS/Focal"
 cp Resources/Info.plist "$STAGE/Contents/Info.plist"
+cp Resources/AppIcon.icns "$STAGE/Contents/Resources/AppIcon.icns"
 xattr -cr "$STAGE"
 
 # A stable signing identity keeps the Accessibility permission across rebuilds;

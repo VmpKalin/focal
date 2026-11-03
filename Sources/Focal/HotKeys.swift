@@ -45,6 +45,7 @@ final class HotKeys {
 extension HotKeys.Combo {
     static let switcher = Self(keyCode: kVK_Space, modifiers: optionKey, display: "⌥Space")
     static let back = Self(keyCode: kVK_ANSI_Grave, modifiers: optionKey, display: "⌥`")
+    static let forward = Self(keyCode: kVK_ANSI_Grave, modifiers: optionKey | shiftKey, display: "⌥⇧`")
     static let summon = Self(keyCode: kVK_Space, modifiers: optionKey | shiftKey, display: "⌥⇧Space")
     static let saveLayout = Self(keyCode: kVK_ANSI_S, modifiers: controlKey | optionKey, display: "⌃⌥S")
 

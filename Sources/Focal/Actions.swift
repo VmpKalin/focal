@@ -58,7 +58,7 @@ enum Actions {
 
     /// Reopens the app and then brings the window it creates to the display I am on.
     static func reopenHere(_ app: NSRunningApplication, moveToCurrentDisplay: Bool = true) async {
-        let target = Screens.current
+        guard let target = Screens.pullTarget else { reopen(app); return }
         reopen(app)
         for _ in 0..<20 {
             await sleep(150)
@@ -77,10 +77,15 @@ enum Actions {
     /// Space if needed, moves it to this display and puts it on top.
     static func bringHere(_ el: AXUIElement, pid: pid_t, moveToCurrentDisplay: Bool = true) async {
         beginBusy(); defer { endBusy() }
-        let target = Screens.current
+        if AX.bool(el, "AXFullScreen") == true {
+            // A full-screen window is its own Space: it cannot be moved, only switched to.
+            raise(el, pid: pid)
+            return
+        }
+        let target = Screens.pullTarget
         let id = AX.windowID(el)
         let originalFrame = AX.frame(el)
-        log.notice("bringHere id=\(id ?? 0, privacy: .public) pid=\(pid, privacy: .public) from=\(String(describing: originalFrame), privacy: .public) to=\(target.localizedName, privacy: .public)")
+        log.notice("bringHere id=\(id ?? 0, privacy: .public) pid=\(pid, privacy: .public) from=\(String(describing: originalFrame), privacy: .public) to=\(target?.localizedName ?? "-", privacy: .public)")
         if let id, !isOnScreen(id), AX.bool(el, kAXMinimizedAttribute) != true {
             // On another Space: a minimize/restore round trip re-opens the window on the active Space.
             AX.set(el, kAXMinimizedAttribute, kCFBooleanTrue)
@@ -90,8 +95,8 @@ enum Actions {
             AX.set(el, kAXMinimizedAttribute, kCFBooleanFalse)
             await sleep(350)
         }
-        if moveToCurrentDisplay { await move(el, to: target) }
-        if let id, let originalFrame, pulled[id] == nil, Screens.screen(for: originalFrame) !== target,
+        if moveToCurrentDisplay, let target { await move(el, to: target) }
+        if let id, let originalFrame, let target, pulled[id] == nil, Screens.screen(for: originalFrame) !== target,
            AX.frame(el).flatMap(Screens.screen(for:)) === target {
             pulled[id] = Pull(pid: pid, from: originalFrame, date: Date())
         }
