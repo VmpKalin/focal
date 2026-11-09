@@ -125,7 +125,14 @@ enum Windows {
                     isOnScreen: zOrder[id] != nil, isFullScreen: AX.bool(el, "AXFullScreen") ?? false, element: el))
             }
         }
-        return items.sorted { (zOrder[$0.id] ?? Int.max, $0.isMinimized ? 1 : 0) < (zOrder[$1.id] ?? Int.max, $1.isMinimized ? 1 : 0) }
+        // Most recently focused first (like ⌘Tab); windows Focal has not seen focused yet follow
+        // in screen stacking order, minimized ones last.
+        let used = MainActor.assumeIsolated { Recency.shared.lastFocused }
+        func key(_ w: WindowItem) -> (Int, Double, Int, Int) {
+            if let t = used[w.id] { return (0, -t.timeIntervalSinceReferenceDate, 0, 0) }
+            return (1, 0, w.isMinimized ? 1 : 0, zOrder[w.id] ?? Int.max)
+        }
+        return items.sorted { key($0) < key($1) }
     }
 
     /// Big windows of `pid` that the window server knows about but that are not on a visible Space.

@@ -52,6 +52,7 @@ final class ContextTracker: ObservableObject {
     static func demo() -> ContextTracker { ContextTracker() }
 
     func start() {
+        Recency.shared.start()
         if let data = try? Data(contentsOf: url), let saved = try? JSONDecoder().decode([WindowContext].self, from: data) {
             history = saved
         }

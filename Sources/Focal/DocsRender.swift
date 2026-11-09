@@ -23,6 +23,27 @@ enum DocsRender {
         save(scene(SnapDiagram(), padding: 0), dir, "snapping.png")
         save(SettingsView(layouts: layouts, contexts: contexts, failedHotKeys: []).environment(\.colorScheme, .dark)
                 .background(Color(nsColor: .windowBackgroundColor)), dir, "settings.png")
+        renderSnapshots(to: dir.appendingPathComponent("snapshots"), contexts: contexts, layouts: layouts)
+    }
+
+    /// Bare panels and illustrations (no background) for `scripts/make-promo.swift`.
+    private static func renderSnapshots(to dir: URL, contexts: ContextTracker, layouts: LayoutStore) {
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let model = SwitcherModel(contexts: contexts, layouts: layouts)
+        func switcher() -> some View { SwitcherView(model: model, thumbs: model.thumbnails) { _ in }.environment(\.colorScheme, .dark) }
+
+        model.showDemo(promoItems(), style: .grid, selection: 1)
+        save(switcher(), dir, "01-grid.png")
+        model.showDemo(promoItems(), style: .list, selection: 1)
+        save(switcher(), dir, "02-list.png")
+        model.showDemo(promoHiddenItems(), style: .list, query: "chrome", selection: 0)
+        save(switcher(), dir, "03-hidden.png")
+        save(PromoSummonArt(), dir, "04-summon.png")
+        save(PromoSetsArt(), dir, "05-sets.png")
+        save(PromoSnapArt(), dir, "06-snap.png")
+        save(SettingsView(layouts: layouts, contexts: contexts, failedHotKeys: []).environment(\.colorScheme, .dark)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous)), dir, "07-settings.png")
     }
 
     // MARK: Rendering
@@ -75,6 +96,45 @@ enum DocsRender {
                        icon: nil, symbol: "clock.arrow.circlepath", badges: ["попередній набір"]),
             SwitchItem(id: "l1", kind: .noWindows(me), title: "Робота", subtitle: "Mail + Calendar + Terminal",
                        icon: nil, symbol: "square.grid.2x2", badges: ["⌃⌥1"]),
+        ]
+    }
+
+    /// Most-recently-used order, as ⌘Tab shows it: the window you just left comes second.
+    private static func promoItems() -> [SwitchItem] {
+        let me = NSRunningApplication.current
+        func w(_ id: String, _ title: String, _ app: String, _ path: String, _ badges: [String], _ color: NSColor) -> SwitchItem {
+            SwitchItem(id: id, kind: .noWindows(me), title: title, subtitle: app, icon: icon(path), symbol: nil,
+                       badges: badges, preview: fakeWindow(color: color, title: title))
+        }
+        return [
+            w("1", "Q4 roadmap — Pages", "Pages", "/Applications/Pages.app", [], .systemOrange),
+            w("2", "The Wild West — S1E4", "Safari", "/Applications/Safari.app", ["повний екран"], .black),
+            w("3", "focal — zsh — 120×40", "Terminal", "/System/Applications/Utilities/Terminal.app", ["інший робочий стіл"], NSColor(white: 0.12, alpha: 1)),
+            w("4", "Trip ideas", "Notes", "/System/Applications/Notes.app", ["Studio Display"], .systemYellow),
+            w("5", "Inbox — Work", "Mail", "/System/Applications/Mail.app", [], .systemBlue),
+            w("6", "This week", "Calendar", "/System/Applications/Calendar.app", ["згорнуте"], .systemRed),
+            w("7", "Focus playlist", "Music", "/System/Applications/Music.app", [], .systemPink),
+            w("8", "Release checklist", "Reminders", "/System/Applications/Reminders.app", [], .systemTeal),
+            w("9", "Downloads", "Finder", "/System/Library/CoreServices/Finder.app", [], .systemBlue),
+            w("10", "Family", "Messages", "/System/Applications/Messages.app", [], .systemGreen),
+            w("11", "Lisbon", "Maps", "/System/Applications/Maps.app", ["інший робочий стіл"], .systemMint),
+            w("12", "Invoice.pdf", "Preview", "/System/Applications/Preview.app", [], .systemGray),
+        ]
+    }
+
+    /// The case macOS gets wrong: three Chrome windows, two of them invisible to App Exposé.
+    private static func promoHiddenItems() -> [SwitchItem] {
+        let chrome = icon("/Applications/Google Chrome.app")
+        let me = NSRunningApplication.current
+        return [
+            SwitchItem(id: "h1", kind: .noWindows(me), title: "The Wild West — S1E4", subtitle: "Google Chrome", icon: chrome, symbol: nil,
+                       badges: ["повний екран", "окремий Space"]),
+            SwitchItem(id: "h2", kind: .noWindows(me), title: "Senior iOS Engineer — Job board", subtitle: "Google Chrome", icon: chrome, symbol: nil,
+                       badges: ["інший робочий стіл"]),
+            SwitchItem(id: "h3", kind: .noWindows(me), title: "Swift Concurrency — Docs", subtitle: "Google Chrome", icon: chrome, symbol: nil,
+                       badges: ["MacBook Pro"]),
+            SwitchItem(id: "h4", kind: .noWindows(me), title: "Weekend plans", subtitle: "Google Chrome", icon: chrome, symbol: nil,
+                       badges: ["згорнуте"]),
         ]
     }
 

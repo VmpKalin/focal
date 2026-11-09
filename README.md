@@ -1,144 +1,154 @@
-<p align="center"><img src="Resources/AppIcon.png" width="128" alt="Focal"></p>
+<p align="center">
+  <img src="Resources/AppIcon.png" width="128" alt="Focal icon">
+</p>
 
-<h1 align="center">Focal — вікна, які приходять до тебе</h1>
+<h1 align="center">Focal</h1>
 
-<p align="center"><img src="docs/switcher-grid.png" width="820" alt="Перемикач вікон з мініатюрами"></p>
+<p align="center"><b>Windows that come to you.</b><br>
+A menu bar window manager for macOS that fixes everything ⌘Tab gets wrong.</p>
 
-Маленький застосунок у рядку меню macOS, який прибирає головний біль із вікнами:
-застосунок «відкрився», а вікна не видно, бо воно згорнуте, на іншому моніторі,
-на іншому робочому столі (Space) або його взагалі немає.
+<p align="center"><img src="docs/promo/01-hero.jpg" alt="Focal window switcher with live previews"></p>
 
-## Чому на Mac вікна «губляться»
+macOS thinks in apps, not windows. ⌘Tab activates Chrome, but its window is minimized, on the other display, on another desktop or in full screen, so you see nothing. Focal makes every switch land: the window appears on the screen you are looking at, ⌘Tab lists windows in the order you used them, and ⌥\` brings back the whole set of windows you were just working with.
 
-macOS думає **застосунками**, а не **вікнами**. ⌘Tab активує застосунок, але
-не гарантує, що ти побачиш його вікно:
+## Why Focal
 
-| Ситуація | Що робить macOS | Що бачиш ти |
-|---|---|---|
-| Вікно на другому дисплеї | активує його там | нічого: ти дивишся на інший екран |
-| Вікно згорнуте в Dock | ⌘Tab його **не** розгортає | нічого |
-| Вікно на іншому Space | перекидає тебе на той Space (або нічого, якщо це вимкнено) | «стрибок» або нічого |
-| У застосунку немає вікон (Chrome без вікон) | просто активує меню | порожній екран |
-| Вікно лишилось на координатах відключеного монітора | нічого | вікно «за межами» |
-| «Автоматично переставляти Spaces» увімкнено (за замовчуванням) | сам міняє порядок робочих столів | вікна «переїжджають» |
-| Вікно в повноекранному режимі | це окремий Space; App Exposé на робочому столі пише «No Available Windows» | «у Chrome два вікна, а видно одне» |
+- **The window shows up where you are.** Switch to an app with ⌘Tab, the Dock or Spotlight, and its window is un-minimized, pulled from the other display, Space or off-screen, or reopened, right under your cursor.
+- **A ⌘Tab that knows windows.** Every window of every app, in most-recently-used order, so the one you just left is always next. Live previews or a compact list, with search by tab or document title.
+- **Nothing hides.** Full-screen windows and windows on other desktops are listed too, labelled with where they are. App Exposé can't do that.
+- **Back and forward for your workspace.** Focal remembers which windows you looked at together. ⌥\` puts the previous set back exactly where it was, ⌥⇧\` goes forward.
+- **Snap like Windows.** ⌃⌥ arrows for halves, quarters and full screen; ⌃⌥⇧ arrows throw a window to the other display, maximized.
+- **Fixes macOS.** Detects the settings that make windows "move" (Space rearranging, Stage Manager) and fixes them in one click.
+- **Private and native.** Swift and SwiftUI, a few MB, no network, no account.
 
-**Чому App Exposé і Dock показують не всі вікна Chrome.** macOS (і Accessibility API)
-показує вікна лише з робочих столів, які зараз на екрані. Повноекранне вікно живе
-на окремому Space, а кожен дисплей має власні робочі столи, тож вікно, відкрите на
-іншому робочому столі другого монітора, «зникає». Меню Chrome «Вікно» знає про всі
-вікна, бо це власний список Chrome. Focal знаходить такі вікна напряму (~30 мс на
-застосунок) і показує їх з позначками «інший робочий стіл» / «повний екран».
+| | |
+| --- | --- |
+| ![A better ⌘Tab](docs/promo/02-command-tab.jpg) | ![Every window](docs/promo/03-every-window.jpg) |
+| ![Windows come to you](docs/promo/04-come-to-you.jpg) | ![Back and forward](docs/promo/05-back-forward.jpg) |
+| ![Snap like Windows](docs/promo/06-snap.jpg) | ![Fixes macOS](docs/promo/07-fixes-macos.jpg) |
 
-Плюс у macOS немає поняття «набір вікон, з якими я зараз працюю»: якщо в тебе
-Chrome + серіал, ти переходиш у Telegram і повертаєшся, ⌘Tab поверне тільки
-один застосунок.
+Raw panel renders are in [docs/screenshots](docs/screenshots). Launch copy is in [docs/marketing/launch-kit.md](docs/marketing/launch-kit.md). The app's interface is in Ukrainian for now.
 
-## Що робить Focal
+## Why windows get lost on a Mac
 
-1. **Вікна приходять до тебе.** Коли ти перемикаєшся на застосунок (⌘Tab, Dock,
-   Spotlight, посилання), а його вікна на твоєму дисплеї не видно, Focal сам
-   розгортає вікно, переносить його з іншого дисплея / Space / з-за меж екрана
-   на дисплей під курсором і піднімає нагору. Якщо вікон немає взагалі, Focal
-   відкриває нове (як клік у Dock). Finder за замовчуванням не чіпається.
-2. **Перемикач `⌥Space`.** Усі вікна всіх застосунків (з усіх робочих столів і
-   повноекранних) з пошуком за назвою вкладки/документа і застосунку, з
-   позначками «згорнуте», «інший дисплей», «інший робочий стіл», «повний екран».
-   `↩` відкриває вікно на твоєму дисплеї, `⌘↩` на його місці, `⌘W` закриває,
-   `⌘M` згортає. Два вигляди (Налаштування → «Вигляд перемикача»):
+| Situation | What macOS does | What you see |
+| --- | --- | --- |
+| Window on the other display | activates it there | nothing, you are looking at the other screen |
+| Window minimized | ⌘Tab does **not** restore it | nothing |
+| Window on another Space | jumps you to that Space, or does nothing | a jump, or nothing |
+| Window in full screen | it is its own Space; App Exposé says "No Available Windows" | "Chrome has two windows but I only see one" |
+| App has no windows | activates the menu bar only | an empty screen |
+| Window left on a disconnected display's coordinates | nothing | the window is off-screen |
+| "Automatically rearrange Spaces" (on by default) | reorders desktops by recent use | windows seem to move around |
 
-   | Список | Мініатюри вікон |
-   |---|---|
-   | <img src="docs/switcher-list.png" width="400"> | <img src="docs/switcher-grid.png" width="400"> |
+App Exposé, the Dock menu and the Accessibility API only report windows on the Spaces currently shown. Focal finds the rest directly (about 30 ms per app) and labels them.
 
-   Мініатюри показують, що зараз у вікні; для цього потрібен дозвіл «Запис екрана»
-   (без нього — іконки застосунків). У сітці стрілки ходять у всі боки.
-3. **Назад і вперед по наборах вікон `⌥`` / `⌥⇧``.** Focal запам'ятовує, які
-   вікна ти реально бачив разом (наприклад Chrome + серіал). `⌥`` повертає
-   попередній набір на свої місця (кожне натискання — ще крок назад), `⌥⇧``
-   веде вперед, аж до поточного. Як «Назад/Вперед» у браузері, тільки для вікон.
-   Вікна, які Focal притягнув до тебе, при поверненні їдуть назад.
-4. **Збережені набори `⌃⌥S` / `⌃⌥1…9`.** Розклади вікна як треба, збережи
-   («Робота», «Серіал»). Відновлення запустить потрібні застосунки, відкриє
-   вікна, розставить їх по місцях і підніме.
-5. **`⌥⇧Space`** притягує вікно активного застосунку на твій дисплей.
-<p align="center"><img src="docs/snapping.png" width="760" alt="Керування вікном"></p>
+## What's inside
 
-6. **Керування активним вікном, як Win + стрілки у Windows** (на Mac це `⌃⌥`,
-   бо `⌘+стрілки` — це рух по тексту, а `⌥⌘+стрілки` перемикають вкладки):
+**Windows come to you**
+- On every app switch (⌘Tab, Dock, Spotlight, links), if nothing of that app is visible where you are, Focal un-minimizes, moves or reopens its window on the display under the cursor and raises it.
+- Pulls windows from the other display, from other Spaces (minimize-and-restore round trip) and from off-screen coordinates; reopens apps that have no windows, like a Dock click.
+- Never drops a window onto a display that shows a full-screen app; it uses the other display instead.
+- Per-option toggles and an ignore list (Finder is ignored by default). ⌥⇧Space pulls the frontmost app's window to you on demand.
 
-   | Клавіші | Дія |
-   |---|---|
-   | `⌃⌥←` / `⌃⌥→` | ліва / права половина; ще раз у той самий бік — на сусідній дисплей; у протилежний — повернути розмір |
-   | `⌃⌥↑` | розгорнути на весь екран; з половини — верхня чверть |
-   | `⌃⌥↓` | з розгорнутого — попередній розмір; з половини — нижня чверть; інакше згорнути |
-   | `⌃⌥⇧←` / `⌃⌥⇧→` | перекинути на дисплей ліворуч / праворуч і одразу розгорнути під нього (вимикається в налаштуваннях) |
-   | `⌃⌥↩` | заповнити екран |
-   | `⌃⌥⌫` | повернути розмір, що був до прилипання |
-   | `⌃⌥F` | справжній повноекранний режим macOS |
-   | `⌃⌥C` | по центру |
-7. **Діагностика налаштувань macOS**, які заважають (автоперестановка Spaces,
-   Stage Manager тощо), з кнопкою виправлення.
+**Switcher (⌘Tab and ⌥Space)**
+- Replaces the system ⌘Tab: hold ⌘, press Tab / ⇧Tab, release ⌘ to open. A quick ⌘Tab goes back to the previous window. Can be turned off.
+- Lists windows in most-recently-used order, including full-screen windows, other desktops, minimized windows and menu bar apps that have windows (Docker Desktop and friends).
+- Two styles: live window previews (ScreenCaptureKit) or a compact list. Badges show full screen, other desktop, other display or minimized.
+- Fuzzy search by window title, tab or document name and app name. ↩ brings the window to your display, ⌘↩ opens it where it is, ⌘W closes, ⌘M minimizes.
+- Also lists recent window sets, saved layouts and running apps without windows.
 
-<p align="center"><img src="docs/settings.png" width="520" alt="Налаштування"></p>
+**Window sets: back and forward**
+- Focal notices which windows you actually look at together (only the visible ones, not those buried underneath).
+- ⌥\` steps back through those sets, ⌥⇧\` steps forward; each set returns with its windows in their places. Windows Focal pulled to another display go back where they came from.
+- Save a set with ⌃⌥S and restore it with ⌃⌥1…9: missing apps are launched, windows reopened and placed.
 
-## Керування з Shortcuts / Raycast / терміналу
+**Snapping**
+- ⌃⌥←/→ halves; press again to continue onto the neighbouring display. ⌃⌥↑ maximize (from a half: top quarter), ⌃⌥↓ restore (from a half: bottom quarter; otherwise minimize).
+- ⌃⌥⇧←/→ moves to the display on the left or right and maximizes there. ⌃⌥F native full screen, ⌃⌥C center, ⌃⌥⌫ size before snapping.
+- Frames are verified after each move because apps clamp their size to the old display a moment later.
 
-```bash
-open -g "focal://switcher"      # показати/сховати перемикач
-open -g "focal://back"          # попередній набір вікон
-open -g "focal://forward"       # наступний набір вікон
-open -g "focal://summon"        # притягнути активне вікно сюди
-open -g "focal://save?name=Робота"
-open -g "focal://layout?n=1"    # відновити набір №1
-open -g "focal://focus?id=123"  # підняти вікно за id
-open -g "focal://snap?to=left"  # left right up down maximize center restore fullscreen displayLeft displayRight
-open -g "focal://dump"          # стан у ~/Library/Application Support/Focal/state.json
-open -g "focal://inspect?app=com.google.Chrome"  # усе про вікна застосунку → inspect.json
-open -g "focal://render-docs?dir=$PWD/docs"      # перемалювати скріншоти README (демо-дані)
-```
+**macOS check-up**
+- Shows Space rearranging, "switch to a Space with open windows", Stage Manager and per-display Spaces, with a one-click fix where it helps.
 
-## Встановлення
+## Keyboard
+
+| Key | Action |
+| --- | --- |
+| ⌘Tab / ⌘⇧Tab | Switcher, next / previous window (release ⌘ to open) |
+| ⌥Space | Switcher with search |
+| ⌥\` / ⌥⇧\` | Previous / next window set |
+| ⌥⇧Space | Bring the frontmost app's window to this display |
+| ⌃⌥← → ↑ ↓ | Halves, quarters, maximize, restore |
+| ⌃⌥⇧← → | Move to the display on the left / right |
+| ⌃⌥↩ · ⌃⌥⌫ · ⌃⌥F · ⌃⌥C | Fill · previous size · full screen · center |
+| ⌃⌥S · ⌃⌥1…9 | Save the current set · restore a saved set |
+
+Inside the switcher: ↑ ↓ (and ← → in the grid) move, ↩ opens here, ⌘↩ opens in place, ⌘W closes, ⌘M minimizes, esc closes.
+
+## Build and install
+
+Requires Xcode or the Command Line Tools (Swift 5.10+) and macOS 14 or later.
 
 ```bash
 scripts/build.sh --install
 ```
 
-Збирає `build/Focal.app`, копіює в `~/Applications` і запускає. Потрібні Xcode
-або Command Line Tools (Swift 5.10+), macOS 14+.
+Builds `build/Focal.app`, copies it to `~/Applications` and launches it. It is signed with your Apple Development certificate when one is available, so the Accessibility permission survives rebuilds.
 
-При першому запуску macOS попросить доступ **Accessibility** (Системні
-параметри → Конфіденційність і безпека → Доступність → увімкнути Focal). Без
-нього Focal не може рухати чужі вікна. Збірка підписується твоїм Apple
-Development сертифікатом, тож доступ не злітає після перезбирання.
+Focal needs **Accessibility** to move other apps' windows (System Settings → Privacy & Security → Accessibility). Live previews also need **Screen Recording**; without it the grid shows app icons. Launch at login is in Focal's settings.
 
-Автозапуск: Налаштування Focal → «Запускати при вході в систему».
+## Tests and checks
 
-## Як це влаштовано
+Focal can be driven from the shell, Shortcuts or Raycast:
 
-- `Sources/Focal/AX.swift`: Accessibility API (позиції, згортання, підняття
-  вікон). Для вікон на інших Spaces використовується той самий прийом, що й в
-  alt-tab-macos (`_AXUIElementCreateWithRemoteToken`).
-- `Windows.swift`: список вікон з WindowServer і розрахунок, які вікна реально
-  видно (а не перекриті іншими).
-- `AutoSummon.swift`: реакція на перемикання застосунків.
-- `Contexts.swift`: історія наборів вікон і `⌥``.
-- `Layouts.swift`: збережені набори.
-- `Switcher.swift`, `Thumbnails.swift`: перемикач `⌥Space` (список і мініатюри через ScreenCaptureKit).
-- `Snap.swift`: керування активним вікном.
-- `DocsRender.swift`, `scripts/make-icon.swift`: скріншоти для README та іконка.
-- `SettingsView.swift`, `App.swift`: налаштування, меню, гарячі клавіші.
+```bash
+open -g "focal://switcher"            # show / hide the switcher
+open -g "focal://back"                # previous window set
+open -g "focal://forward"             # next window set
+open -g "focal://summon"              # bring the frontmost window here
+open -g "focal://snap?to=left"        # left right up down maximize center restore fullscreen displayLeft displayRight
+open -g "focal://save?name=Work"      # save the visible windows as a layout
+open -g "focal://layout?n=1"          # restore layout 1
+open -g "focal://focus?id=123"        # raise a window by id
+open -g "focal://dump"                # Focal's view of all windows → state.json
+open -g "focal://inspect?app=com.google.Chrome"   # everything macOS reports about one app → inspect.json
+```
 
-Дані лежать у `~/Library/Application Support/Focal/`.
+Debug output goes to `~/Library/Application Support/Focal/`. `defaults write dev.focal.app debugScreen -int N` pins "the display I am on" to screen N, which makes multi-display scenarios scriptable.
 
-## Обмеження
+Screenshots and promo images are rendered from demo data, never from your real windows:
 
-- Переносити вікно між Spaces публічним API macOS не дозволяє, тому Focal
-  робить «згорнути → розгорнути»: розгорнуте вікно з'являється на поточному Space.
-  Через це видно коротку анімацію.
-- Повноекранні вікна (окремий Space) не переносяться: Focal на них просто перемикає.
-- Якщо на дисплеї, де ти зараз, відкритий повноекранний застосунок, звичайне вікно
-  туди не поставиш (воно опиниться на прихованому робочому столі). Тому Focal
-  притягує вікно на інший дисплей, а якщо обидва в повному екрані, лишає це macOS.
-- Гарячі клавіші поки фіксовані; якщо якусь займає інша програма, Focal
-  покаже це в налаштуваннях.
+```bash
+open -g "focal://render-docs?dir=/tmp/focal-docs"
+```
+
+```bash
+swift scripts/make-promo.swift /tmp/focal-docs/snapshots docs/promo
+```
+
+The icon is drawn by `swift scripts/make-icon.swift Resources/AppIcon.png`.
+
+## Layout
+
+```
+Sources/Focal/AX.swift            Accessibility wrapper, windows on other Spaces via remote AX tokens
+Sources/Focal/Windows.swift       window list, what is actually visible, MRU ordering
+Sources/Focal/Recency.swift       which window was focused when
+Sources/Focal/AutoSummon.swift    reaction to app switches
+Sources/Focal/Actions.swift       raise, move, pull from other Spaces, restore sets
+Sources/Focal/Contexts.swift      window-set history and back / forward
+Sources/Focal/Layouts.swift       saved sets
+Sources/Focal/Switcher.swift      ⌘Tab / ⌥Space panel (list and grid)
+Sources/Focal/CommandTab.swift    takes ⌘Tab from the system switcher and gives it back on quit
+Sources/Focal/Snap.swift          Windows-style snapping
+Sources/Focal/SettingsView.swift  settings and the macOS check-up
+Sources/Focal/DocsRender.swift    demo renders for docs; PromoArt.swift holds the illustrations
+scripts/                          build, icon and promo generators
+```
+
+## Limitations
+
+- macOS has no public API to move a window between Spaces, so Focal minimizes and restores it, which shows a short animation.
+- Full-screen windows cannot be moved; Focal switches to their Space instead.
+- Taking over ⌘Tab uses a private CoreGraphics call. Focal gives ⌘Tab back when it quits; after a crash it comes back on the next launch or log-in.
