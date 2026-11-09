@@ -328,6 +328,9 @@ final class SwitcherController: NSObject, NSWindowDelegate {
     let model: SwitcherModel
     private var panel: SwitcherPanel?
     private var keyMonitor: Any?
+    private var flagsMonitors: [Any] = []
+    /// Opened with ⌘Tab: letting go of ⌘ opens the selection, like the system switcher.
+    private var commitOnCommandUp = false
     var onNeedsPermission: () -> Void = {}
 
     init(model: SwitcherModel) { self.model = model }
@@ -336,7 +339,37 @@ final class SwitcherController: NSObject, NSWindowDelegate {
 
     func toggle() { isShown ? hide() : show() }
 
+    /// ⌘Tab / ⌘⇧Tab: the first press opens the switcher, further presses move the selection.
+    func cycle(backward: Bool) {
+        if isShown {
+            model.move(backward ? -1 : 1)
+            return
+        }
+        show()
+        guard isShown else { return }
+        if backward { model.selection = max(0, model.visible.count - 1) }
+        commitOnCommandUp = true
+        if flagsMonitors.isEmpty {
+            let onFlags: (NSEvent) -> Void = { [weak self] e in
+                MainActor.assumeIsolated { if !e.modifierFlags.contains(.command) { self?.commandReleased() } }
+            }
+            flagsMonitors = [
+                NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { onFlags($0); return $0 },
+                NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: onFlags),
+            ].compactMap { $0 }
+        }
+        // A quick tap can let go of ⌘ before the hotkey even reached us.
+        if !CGEventSource.flagsState(.combinedSessionState).contains(.maskCommand) { commandReleased() }
+    }
+
+    private func commandReleased() {
+        guard commitOnCommandUp, isShown else { return }
+        commitOnCommandUp = false
+        if let s = model.selected { activate(s, flipPlacement: false) } else { hide() }
+    }
+
     func show() {
+        commitOnCommandUp = false
         guard AX.isTrusted else { onNeedsPermission(); return }
         model.reload()
         let panel = self.panel ?? makePanel()
@@ -357,6 +390,9 @@ final class SwitcherController: NSObject, NSWindowDelegate {
         panel?.orderOut(nil)
         if let m = keyMonitor { NSEvent.removeMonitor(m) }
         keyMonitor = nil
+        flagsMonitors.forEach(NSEvent.removeMonitor)
+        flagsMonitors = []
+        commitOnCommandUp = false
     }
 
     func windowDidResignKey(_ notification: Notification) { hide() }

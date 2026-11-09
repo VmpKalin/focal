@@ -16,6 +16,7 @@ enum Prefs {
         static let ignoredApps = "ignoredApps"
         static let maximizeOnDisplayMove = "maximizeOnDisplayMove"
         static let switcherStyle = "switcherStyle"
+        static let replaceCommandTab = "replaceCommandTab"
     }
 
     static func registerDefaults() {
@@ -30,6 +31,7 @@ enum Prefs {
             Key.ignoredApps: "com.apple.finder",
             Key.maximizeOnDisplayMove: true,
             Key.switcherStyle: "list",
+            Key.replaceCommandTab: true,
         ])
     }
 

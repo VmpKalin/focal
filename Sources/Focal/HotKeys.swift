@@ -11,7 +11,7 @@ final class HotKeys {
     }
 
     private var handlers: [UInt32: () -> Void] = [:]
-    private var refs: [EventHotKeyRef] = []
+    private var refs: [UInt32: EventHotKeyRef] = [:]
     private var nextID: UInt32 = 1
 
     private init() {
@@ -26,19 +26,24 @@ final class HotKeys {
         }, 1, &spec, nil, nil)
     }
 
-    /// Returns false if another app already owns the combination.
+    /// Returns an id for `unregister`, or nil if another app already owns the combination.
     @discardableResult
-    func register(_ combo: Combo, _ handler: @escaping () -> Void) -> Bool {
+    func register(_ combo: Combo, _ handler: @escaping () -> Void) -> UInt32? {
         let id = nextID
         nextID += 1
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(UInt32(combo.keyCode), UInt32(combo.modifiers),
                                          EventHotKeyID(signature: OSType(0x46_4F_43_4C), id: id), // 'FOCL'
                                          GetApplicationEventTarget(), 0, &ref)
-        guard status == noErr, let ref else { return false }
-        refs.append(ref)
+        guard status == noErr, let ref else { return nil }
+        refs[id] = ref
         handlers[id] = handler
-        return true
+        return id
+    }
+
+    func unregister(_ id: UInt32) {
+        if let ref = refs.removeValue(forKey: id) { UnregisterEventHotKey(ref) }
+        handlers[id] = nil
     }
 }
 
@@ -48,6 +53,8 @@ extension HotKeys.Combo {
     static let forward = Self(keyCode: kVK_ANSI_Grave, modifiers: optionKey | shiftKey, display: "⌥⇧`")
     static let summon = Self(keyCode: kVK_Space, modifiers: optionKey | shiftKey, display: "⌥⇧Space")
     static let saveLayout = Self(keyCode: kVK_ANSI_S, modifiers: controlKey | optionKey, display: "⌃⌥S")
+    static let commandTab = Self(keyCode: kVK_Tab, modifiers: cmdKey, display: "⌘Tab")
+    static let commandShiftTab = Self(keyCode: kVK_Tab, modifiers: cmdKey | shiftKey, display: "⌘⇧Tab")
 
     static func snap(_ a: SnapAction) -> Self {
         let co = controlKey | optionKey

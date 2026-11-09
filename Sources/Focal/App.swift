@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var settingsWindow: NSWindow?
     private var failedHotKeys: [String] = []
+    private var commandTabHotKeys: [UInt32] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Prefs.registerDefaults()
@@ -25,6 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         switcher.onNeedsPermission = { [weak self] in self?.showSettings() }
         registerHotKeys()
+        CommandTab.quitCleanlyOnSignals()
+        // Undo a previous run that crashed while holding ⌘Tab.
+        CommandTab.setSystemSwitcherEnabled(true)
+        applyCommandTab()
+        NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyCommandTab() }
+        }
         contexts.start()
         autoSummon.start()
 
@@ -34,10 +42,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        CommandTab.setSystemSwitcherEnabled(true)
+    }
+
+    /// Hands ⌘Tab to Focal's switcher or back to the system one, following the setting.
+    private func applyCommandTab() {
+        let wanted = Prefs.bool(Prefs.Key.replaceCommandTab)
+        guard wanted == commandTabHotKeys.isEmpty else { return }
+        if wanted {
+            CommandTab.setSystemSwitcherEnabled(false)
+            commandTabHotKeys = [
+                HotKeys.shared.register(.commandTab) { [weak self] in MainActor.assumeIsolated { self?.switcher.cycle(backward: false) } },
+                HotKeys.shared.register(.commandShiftTab) { [weak self] in MainActor.assumeIsolated { self?.switcher.cycle(backward: true) } },
+            ].compactMap { $0 }
+            if commandTabHotKeys.count < 2 {
+                commandTabHotKeys.forEach(HotKeys.shared.unregister)
+                commandTabHotKeys = []
+                CommandTab.setSystemSwitcherEnabled(true)
+                if !failedHotKeys.contains(HotKeys.Combo.commandTab.display) { failedHotKeys.append(HotKeys.Combo.commandTab.display) }
+            }
+        } else {
+            commandTabHotKeys.forEach(HotKeys.shared.unregister)
+            commandTabHotKeys = []
+            CommandTab.setSystemSwitcherEnabled(true)
+        }
+    }
+
     private func registerHotKeys() {
         let hk = HotKeys.shared
         func reg(_ combo: HotKeys.Combo, _ action: @escaping @MainActor () -> Void) {
-            if !hk.register(combo, { MainActor.assumeIsolated { action() } }) { failedHotKeys.append(combo.display) }
+            if hk.register(combo, { MainActor.assumeIsolated { action() } }) == nil { failedHotKeys.append(combo.display) }
         }
         reg(.switcher) { [weak self] in self?.switcher.toggle() }
         reg(.back) { [weak self] in self?.goBack() }
@@ -153,7 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item("⚠️ Надати доступ Accessibility…") { [weak self] in self?.showSettings() })
             menu.addItem(.separator())
         }
-        menu.addItem(item("Перемикач вікон", key: "⌥Space") { [weak self] in self?.switcher.show() })
+        menu.addItem(item("Перемикач вікон", key: commandTabHotKeys.isEmpty ? "⌥Space" : "⌘Tab / ⌥Space") { [weak self] in self?.switcher.show() })
         menu.addItem(item("Назад до попереднього набору", key: "⌥`") { [weak self] in self?.goBack() })
         let fwd = item("Вперед до наступного набору", key: "⌥⇧`") { [weak self] in self?.goForward() }
         fwd.isEnabled = contexts.canGoForward

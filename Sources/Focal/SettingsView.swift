@@ -18,6 +18,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.ignoredApps) private var ignoredApps = "com.apple.finder"
     @AppStorage(Prefs.Key.maximizeOnDisplayMove) private var maximizeOnDisplayMove = true
     @AppStorage(Prefs.Key.switcherStyle) private var switcherStyle = "list"
+    @AppStorage(Prefs.Key.replaceCommandTab) private var replaceCommandTab = true
     @State private var canRecord = Thumbnails.hasPermission
 
     @State private var trusted = AX.isTrusted
@@ -79,6 +80,11 @@ struct SettingsView: View {
                     Text("Мініатюри вікон").tag("grid")
                 }
                 .pickerStyle(.segmented)
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle("⌘Tab відкриває перемикач Focal замість системного", isOn: $replaceCommandTab)
+                    Text("Тримай ⌘ і тисни Tab (⇧Tab — назад), відпусти ⌘, щоб відкрити. Пошук — як і раніше, на ⌥Space.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if switcherStyle == "grid" {
                     HStack {
                         Image(systemName: canRecord ? "checkmark.seal.fill" : "eye.slash").foregroundStyle(canRecord ? .green : .orange)
