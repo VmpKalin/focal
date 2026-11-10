@@ -35,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         contexts.start()
         autoSummon.start()
+        _ = InstalledApps.all() // warm the list before the first search
+        if AX.isTrusted { _ = Windows.items() } // starts looking for windows on other Spaces
 
         if !AX.isTrusted {
             AX.requestTrust()
@@ -172,7 +174,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             let axRaw = (AX.value(AX.app(pid), kAXWindowsAttribute) as? [AXUIElement] ?? []).map(ax)
             let t0 = Date()
-            let brute = AX.bruteForceWindows(pid).map(ax)
+            var brute: [[String: Any]] = []
+            AX.forEachWindowElement(pid) { el, eid in
+                brute.append(ax(el).merging(["elementID": eid]) { a, _ in a }); return true
+            }
             out.append(["pid": pid, "cgWindows": cg, "axWindows": axRaw, "bruteForce": brute,
                         "bruteForceMs": Int(Date().timeIntervalSince(t0) * 1000)])
         }

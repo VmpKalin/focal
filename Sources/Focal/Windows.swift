@@ -101,8 +101,9 @@ enum Windows {
     ///
     /// kAXWindows only reports windows on the Spaces currently shown, so windows on other desktops
     /// and in full screen (which is its own Space) are invisible to it, exactly like in App Exposé.
-    /// For apps where the window server knows more windows than AX reports, the remaining ones are
-    /// found by enumerating AX element tokens (~30 ms per app, only done for those apps).
+    /// For apps where the window server knows more windows than AX reports, the remaining ones come
+    /// from OffSpaceWindows, which looks for them in the background (the switcher refreshes when it
+    /// finds some).
     static func items() -> [WindowItem] {
         let zOrder = Dictionary(cgWindows(onScreenOnly: true).enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
         let bigByPID = Dictionary(grouping: cgWindows(onScreenOnly: false).filter { $0.frame.width >= 250 && $0.frame.height >= 200 }, by: \.pid)
@@ -112,7 +113,7 @@ enum Windows {
             let known = Set(els.compactMap(AX.windowID))
             let missing = Set((bigByPID[app.processIdentifier] ?? []).map(\.id)).subtracting(known)
             if !missing.isEmpty {
-                els += AX.bruteForceWindows(app.processIdentifier).filter { AX.windowID($0).map(missing.contains) ?? false }
+                els += OffSpaceWindows.shared.windows(pid: app.processIdentifier, missing: missing)
             }
             for el in els {
                 guard let id = AX.windowID(el) else { continue }
@@ -125,6 +126,7 @@ enum Windows {
                     isOnScreen: zOrder[id] != nil, isFullScreen: AX.bool(el, "AXFullScreen") ?? false, element: el))
             }
         }
+        OffSpaceWindows.shared.forget(exceptRunning: Set(NSWorkspace.shared.runningApplications.map(\.processIdentifier)))
         // Most recently focused first (like ⌘Tab); windows Focal has not seen focused yet follow
         // in screen stacking order, minimized ones last.
         let used = MainActor.assumeIsolated { Recency.shared.lastFocused }

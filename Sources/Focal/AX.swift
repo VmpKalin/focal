@@ -82,23 +82,42 @@ enum AX {
     /// Finds a window by id, including windows on other Spaces that kAXWindows does not report.
     static func window(pid: pid_t, id: CGWindowID) -> AXUIElement? {
         if let w = windows(pid).first(where: { windowID($0) == id }) { return w }
+        if let w = OffSpaceWindows.shared.cached(pid: pid, id: id) { return w }
         return bruteForceWindows(pid, stopAt: id).first(where: { windowID($0) == id })
     }
 
-    /// Windows of `pid` on every Space. Enumerates remote AX element tokens, the same trick alt-tab-macos uses.
-    static func bruteForceWindows(_ pid: pid_t, stopAt target: CGWindowID? = nil) -> [AXUIElement] {
+    /// Windows of `pid` on every Space, synchronously (up to a few hundred ms for a long-running app).
+    static func bruteForceWindows(_ pid: pid_t, stopAt target: CGWindowID? = nil, limit: UInt64 = .max) -> [AXUIElement] {
+        var found: [AXUIElement] = []
+        forEachWindowElement(pid, limit: limit) { el, _ in
+            found.append(el)
+            return target == nil || windowID(el) != target
+        }
+        return found
+    }
+
+    /// Calls `body` with every window of `pid` on every Space, until it returns false. Enumerates remote
+    /// AX element tokens, the same trick alt-tab-macos uses. Apps hand out element ids in order, and one
+    /// running for days is far past the first thousand, so the walk only stops after `gap` ids in a row
+    /// that don't exist yet. Each id is an IPC round trip (~20 µs): call it off the main thread.
+    static func forEachWindowElement(_ pid: pid_t, limit: UInt64 = .max, gap: UInt64 = 5000,
+                                     _ body: (AXUIElement, UInt64) -> Bool) {
         var token = Data(count: 20)
         token.replaceSubrange(0..<4, with: withUnsafeBytes(of: Int32(pid)) { Data($0) })
         token.replaceSubrange(4..<8, with: withUnsafeBytes(of: Int32(0)) { Data($0) })
         token.replaceSubrange(8..<12, with: withUnsafeBytes(of: Int32(0x636f636f)) { Data($0) })
-        var found: [AXUIElement] = []
-        for elementID: UInt64 in 0..<1000 {
+        var lastExisting: UInt64 = 0
+        var elementID: UInt64 = 0
+        while elementID < limit, elementID <= lastExisting + gap {
             token.replaceSubrange(12..<20, with: withUnsafeBytes(of: elementID) { Data($0) })
-            guard let el = _AXUIElementCreateWithRemoteToken(token as CFData)?.takeRetainedValue(),
-                  isRealWindow(el) else { continue }
-            found.append(el)
-            if let target, windowID(el) == target { break }
+            if let el = _AXUIElementCreateWithRemoteToken(token as CFData)?.takeRetainedValue() {
+                var role: CFTypeRef?
+                if AXUIElementCopyAttributeValue(el, kAXRoleAttribute as CFString, &role) == .success {
+                    lastExisting = elementID
+                    if role as? String == kAXWindowRole as String, isRealWindow(el), !body(el, elementID) { return }
+                }
+            }
+            elementID += 1
         }
-        return found
     }
 }

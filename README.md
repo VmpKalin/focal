@@ -41,7 +41,7 @@ Raw panel renders are in [docs/screenshots](docs/screenshots). Launch copy is in
 | Window left on a disconnected display's coordinates | nothing | the window is off-screen |
 | "Automatically rearrange Spaces" (on by default) | reorders desktops by recent use | windows seem to move around |
 
-App Exposé, the Dock menu and the Accessibility API only report windows on the Spaces currently shown. Focal finds the rest directly (about 30 ms per app) and labels them.
+App Exposé, the Dock menu and the Accessibility API only report windows on the Spaces currently shown. Focal finds the rest directly, in the background so ⌘Tab never waits, and labels them.
 
 ## What's inside
 
@@ -55,7 +55,7 @@ App Exposé, the Dock menu and the Accessibility API only report windows on the 
 - Replaces the system ⌘Tab: hold ⌘, press Tab / ⇧Tab, release ⌘ to open. A quick ⌘Tab goes back to the previous window. Can be turned off.
 - Lists windows in most-recently-used order, including full-screen windows, other desktops, minimized windows and menu bar apps that have windows (Docker Desktop and friends).
 - Two styles: live window previews (ScreenCaptureKit) or a compact list. Badges show full screen, other desktop, other display or minimized.
-- Fuzzy search by window title, tab or document name and app name. ↩ brings the window to your display, ⌘↩ opens it where it is, ⌘W closes, ⌘M minimizes.
+- Fuzzy search by window title, tab or document name and app name (including the name Finder shows, so "vs code" finds Visual Studio Code). Apps that aren't running show up too and launch on ↩. ↩ brings the window to your display, ⌘↩ opens it where it is, ⌘W closes, ⌘M minimizes.
 - Also lists recent window sets, saved layouts and running apps without windows.
 
 **Window sets: back and forward**

@@ -10,6 +10,7 @@ struct SwitchItem: Identifiable {
         case noWindows(NSRunningApplication)
         case context(WindowContext)
         case layout(Layout, index: Int)
+        case launch(URL)
     }
 
     let id: String
@@ -21,8 +22,10 @@ struct SwitchItem: Identifiable {
     let badges: [String]
     /// Fixed preview image (demo renders); live windows use Thumbnails instead.
     var preview: NSImage? = nil
+    /// Extra text the search matches but the UI doesn't show.
+    var keywords = ""
 
-    var searchable: String { "\(title) \(subtitle)" }
+    var searchable: String { "\(title) \(subtitle) \(keywords)" }
 
     var windowID: CGWindowID? {
         if case .window(let w) = kind { return w.id }
@@ -51,6 +54,8 @@ final class SwitcherModel: ObservableObject {
     let thumbnails = Thumbnails()
 
     private var all: [SwitchItem] = []
+    /// Apps that aren't running; offered only while searching, like Spotlight.
+    private var installed: [InstalledApps.App] = []
     let contexts: ContextTracker
     let layouts: LayoutStore
 
@@ -72,7 +77,8 @@ final class SwitcherModel: ObservableObject {
             else if let s = Screens.screen(for: w.frame), s !== here { badges.append(s.localizedName) }
             else if Screens.screen(for: w.frame) == nil { badges.append("за межами екрана") }
             return SwitchItem(id: "w\(w.id)", kind: .window(w), title: w.title,
-                              subtitle: w.app.localizedName ?? "", icon: w.app.icon, symbol: nil, badges: badges)
+                              subtitle: w.app.localizedName ?? "", icon: w.app.icon, symbol: nil, badges: badges,
+                              keywords: InstalledApps.fileName(w.app))
         }
 
         contexts.prune()
@@ -91,8 +97,11 @@ final class SwitcherModel: ObservableObject {
         for app in Windows.regularApps() where !withWindows.contains(app.processIdentifier) {
             items.append(SwitchItem(id: "a\(app.processIdentifier)", kind: .noWindows(app),
                                     title: app.localizedName ?? "?", subtitle: "немає відкритих вікон",
-                                    icon: app.icon, symbol: nil, badges: ["нове вікно"]))
+                                    icon: app.icon, symbol: nil, badges: ["нове вікно"],
+                                    keywords: InstalledApps.fileName(app)))
         }
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleURL?.standardizedFileURL })
+        installed = InstalledApps.all().filter { !running.contains($0.url) }
         if style == .grid {
             thumbnails.forget(except: Set(windows.map(\.id)))
             thumbnails.load(windows.map(\.id))
@@ -112,7 +121,11 @@ final class SwitcherModel: ObservableObject {
         if q.isEmpty {
             visible = all
         } else {
-            visible = all.compactMap { item in score(item.searchable.lowercased(), q).map { (item, $0) } }
+            // On a tie an open window or running app wins over launching another one.
+            let launchable = installed.compactMap { app in
+                score(app.searchable, q).map { (app.item, $0 - 1) }
+            }.sorted { $0.1 > $1.1 }.prefix(8)
+            visible = (all.compactMap { item in score(item.searchable.lowercased(), q).map { (item, $0) } } + launchable)
                 .enumerated()
                 .sorted { ($0.element.1, -$0.offset) > ($1.element.1, -$1.offset) }
                 .map(\.element.0)
@@ -333,9 +346,24 @@ final class SwitcherController: NSObject, NSWindowDelegate {
     private var commitOnCommandUp = false
     var onNeedsPermission: () -> Void = {}
 
-    init(model: SwitcherModel) { self.model = model }
+    init(model: SwitcherModel) {
+        self.model = model
+        super.init()
+        NotificationCenter.default.addObserver(forName: OffSpaceWindows.didFind, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshKeepingQuery() }
+        }
+    }
 
     var isShown: Bool { panel?.isVisible == true }
+
+    /// Adds windows found in the background without losing what the user typed or picked.
+    private func refreshKeepingQuery() {
+        guard isShown else { return }
+        let query = model.query, selectedID = model.selected?.id
+        model.reload()
+        model.query = query
+        if let selectedID, let i = model.visible.firstIndex(where: { $0.id == selectedID }) { model.selection = i }
+    }
 
     func toggle() { isShown ? hide() : show() }
 
@@ -452,6 +480,8 @@ final class SwitcherController: NSObject, NSWindowDelegate {
                 await Actions.summon(app)
             case .noWindows(let app):
                 await Actions.reopenHere(app, moveToCurrentDisplay: bringHere)
+            case .launch(let url):
+                _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
             case .context(let ctx):
                 await model.contexts.restore(ctx)
             case .layout(let layout, _):
