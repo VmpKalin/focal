@@ -109,7 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case "back": goBack()
             case "forward": goForward()
             case "summon": Task { await Actions.summonFrontmost() }
-            case "save": _ = layouts.saveCurrent(named: q.first { $0.name == "name" }?.value ?? "Набір \(layouts.layouts.count + 1)")
+            case "save": _ = layouts.saveCurrent(named: q.first { $0.name == "name" }?.value ?? tr("Set \(layouts.layouts.count + 1)", "Набір \(layouts.layouts.count + 1)"))
             case "layout": Task { await layouts.restore(at: (Int(q.first { $0.name == "n" }?.value ?? "") ?? 0) - 1) }
             case "settings": showSettings()
             case "dump": dump()
@@ -190,27 +190,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         if !AX.isTrusted {
-            menu.addItem(item("⚠️ Надати доступ Accessibility…") { [weak self] in self?.showSettings() })
+            menu.addItem(item(tr("⚠️ Grant Accessibility access…", "⚠️ Надати доступ Accessibility…")) { [weak self] in self?.showSettings() })
             menu.addItem(.separator())
         }
-        menu.addItem(item("Перемикач вікон", key: commandTabHotKeys.isEmpty ? "⌥Space" : "⌘Tab / ⌥Space") { [weak self] in self?.switcher.show() })
-        menu.addItem(item("Назад до попереднього набору", key: "⌥`") { [weak self] in self?.goBack() })
-        let fwd = item("Вперед до наступного набору", key: "⌥⇧`") { [weak self] in self?.goForward() }
+        menu.addItem(item(tr("Window switcher", "Перемикач вікон"), key: commandTabHotKeys.isEmpty ? "⌥Space" : "⌘Tab / ⌥Space") { [weak self] in self?.switcher.show() })
+        menu.addItem(item(tr("Back to previous set", "Назад до попереднього набору"), key: "⌥`") { [weak self] in self?.goBack() })
+        let fwd = item(tr("Forward to next set", "Вперед до наступного набору"), key: "⌥⇧`") { [weak self] in self?.goForward() }
         fwd.isEnabled = contexts.canGoForward
         menu.addItem(fwd)
-        menu.addItem(item("Притягнути активне вікно сюди", key: "⌥⇧Space") { Task { await Actions.summonFrontmost() } })
+        menu.addItem(item(tr("Bring active window here", "Притягнути активне вікно сюди"), key: "⌥⇧Space") { Task { await Actions.summonFrontmost() } })
         let windowMenu = NSMenu()
         let names: [(SnapAction, String)] = [
-            (.left, "Ліва половина"), (.right, "Права половина"), (.up, "Розгорнути / верхня чверть"),
-            (.down, "Відновити / нижня чверть / згорнути"), (.maximize, "Заповнити екран"), (.center, "По центру"),
-            (.restore, "Попередній розмір"), (.fullscreen, "Повноекранний режим"),
-            (.displayLeft, "На дисплей ліворуч"), (.displayRight, "На дисплей праворуч"),
+            (.left, tr("Left half", "Ліва половина")), (.right, tr("Right half", "Права половина")), (.up, tr("Maximize / top quarter", "Розгорнути / верхня чверть")),
+            (.down, tr("Restore / bottom quarter / minimize", "Відновити / нижня чверть / згорнути")), (.maximize, tr("Fill screen", "Заповнити екран")), (.center, tr("Center", "По центру")),
+            (.restore, tr("Previous size", "Попередній розмір")), (.fullscreen, tr("Full screen", "Повноекранний режим")),
+            (.displayLeft, tr("To display on the left", "На дисплей ліворуч")), (.displayRight, tr("To display on the right", "На дисплей праворуч")),
         ]
         for (a, title) in names {
             // Runs after the menu closes, so the user's app is frontmost again.
             windowMenu.addItem(item(title, key: HotKeys.Combo.snap(a).display) { Task { try? await Task.sleep(nanoseconds: 150_000_000); await Snap.perform(a) } })
         }
-        let windowItem = NSMenuItem(title: "Активне вікно", action: nil, keyEquivalent: "")
+        let windowItem = NSMenuItem(title: tr("Active window", "Активне вікно"), action: nil, keyEquivalent: "")
         windowItem.submenu = windowMenu
         menu.addItem(windowItem)
         menu.addItem(.separator())
@@ -222,8 +222,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             mi.toolTip = ctx.detail
             recent.addItem(mi)
         }
-        if recent.items.isEmpty { recent.addItem(disabled("Поки порожньо")) }
-        let recentItem = NSMenuItem(title: "Попередні набори", action: nil, keyEquivalent: "")
+        if recent.items.isEmpty { recent.addItem(disabled(tr("Nothing yet", "Поки порожньо"))) }
+        let recentItem = NSMenuItem(title: tr("Previous sets", "Попередні набори"), action: nil, keyEquivalent: "")
         recentItem.submenu = recent
         menu.addItem(recentItem)
 
@@ -232,21 +232,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             saved.addItem(item(layout.name, key: i < 9 ? "⌃⌥\(i + 1)" : nil) { [weak self] in Task { await self?.layouts.restore(layout) } })
         }
         if !saved.items.isEmpty { saved.addItem(.separator()) }
-        saved.addItem(item("Зберегти поточний набір…", key: "⌃⌥S") { [weak self] in self?.layouts.promptAndSaveCurrent() })
-        saved.addItem(item("Керувати…") { [weak self] in self?.showSettings() })
-        let savedItem = NSMenuItem(title: "Збережені набори", action: nil, keyEquivalent: "")
+        saved.addItem(item(tr("Save current set…", "Зберегти поточний набір…"), key: "⌃⌥S") { [weak self] in self?.layouts.promptAndSaveCurrent() })
+        saved.addItem(item(tr("Manage…", "Керувати…")) { [weak self] in self?.showSettings() })
+        let savedItem = NSMenuItem(title: tr("Saved sets", "Збережені набори"), action: nil, keyEquivalent: "")
         savedItem.submenu = saved
         menu.addItem(savedItem)
 
         menu.addItem(.separator())
-        let auto = item("Притягувати вікна автоматично") {
+        let auto = item(tr("Bring windows here automatically", "Притягувати вікна автоматично")) {
             UserDefaults.standard.set(!Prefs.bool(Prefs.Key.autoSummon), forKey: Prefs.Key.autoSummon)
         }
         auto.state = Prefs.bool(Prefs.Key.autoSummon) ? .on : .off
         menu.addItem(auto)
-        menu.addItem(item("Налаштування…") { [weak self] in self?.showSettings() })
+        menu.addItem(item(tr("Settings…", "Налаштування…")) { [weak self] in self?.showSettings() })
         menu.addItem(.separator())
-        menu.addItem(item("Вийти з Focal") { NSApp.terminate(nil) })
+        menu.addItem(item(tr("Quit Focal", "Вийти з Focal")) { NSApp.terminate(nil) })
     }
 
     private func item(_ title: String, key: String? = nil, _ action: @escaping @MainActor () -> Void) -> NSMenuItem {

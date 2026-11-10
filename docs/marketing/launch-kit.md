@@ -70,7 +70,7 @@ Regenerate them with `focal://render-docs` and `scripts/make-promo.swift` (see R
 
 ## Before a public release
 
-- [ ] English (and other) localization: the UI is Ukrainian only today.
+- [x] English and Ukrainian interface (Settings → Language). More languages: add a column to `tr()` calls or move to a String Catalog.
 - [ ] Developer ID signing and notarization, DMG.
 - [ ] Decide on the ⌘Tab takeover default: it uses a private API, so it may not be allowed in the Mac App Store; distribute directly.
 - [ ] A short screen recording (see above).

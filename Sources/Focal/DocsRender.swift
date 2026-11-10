@@ -6,11 +6,13 @@ import SwiftUI
 @MainActor
 enum DocsRender {
     static func renderAll(to dir: URL) {
+        L10n.override = .en
+        defer { L10n.override = nil }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let contexts = ContextTracker.demo()
         let layouts = LayoutStore(demo: [
-            Layout(name: "Робота", windows: demoSnaps(["Mail", "Calendar", "Terminal"])),
-            Layout(name: "Серіал", windows: demoSnaps(["Safari", "Notes"])),
+            Layout(name: tr("Work", "Робота"), windows: demoSnaps(["Mail", "Calendar", "Terminal"])),
+            Layout(name: tr("Series", "Серіал"), windows: demoSnaps(["Safari", "Notes"])),
         ])
         let model = SwitcherModel(contexts: contexts, layouts: layouts)
 
@@ -86,15 +88,15 @@ enum DocsRender {
         }
         return [
             w("1", "Release notes — Pages", "Pages", "/Applications/Pages.app", [], .systemOrange),
-            w("2", "Серіал — сезон 1, серія 4", "Safari", "/Applications/Safari.app", ["повний екран"], .black),
-            w("3", "focal — zsh — 120×40", "Terminal", "/System/Applications/Utilities/Terminal.app", ["інший робочий стіл"], NSColor(white: 0.12, alpha: 1)),
-            w("4", "Ідеї для відпустки", "Notes", "/System/Applications/Notes.app", ["U28 Display"], .systemYellow),
-            w("5", "Робоча пошта", "Mail", "/System/Applications/Mail.app", [], .systemBlue),
-            w("6", "Тиждень", "Calendar", "/System/Applications/Calendar.app", ["згорнуте"], .systemRed),
-            w("7", "Музика — Плейлист «Фокус»", "Music", "/System/Applications/Music.app", [], .systemPink),
-            SwitchItem(id: "c1", kind: .noWindows(me), title: "Safari + Notes", subtitle: "Серіал — сезон 1 · Ідеї для відпустки",
-                       icon: nil, symbol: "clock.arrow.circlepath", badges: ["попередній набір"]),
-            SwitchItem(id: "l1", kind: .noWindows(me), title: "Робота", subtitle: "Mail + Calendar + Terminal",
+            w("2", "Серіал — сезон 1, серія 4", "Safari", "/Applications/Safari.app", [tr("full screen", "повний екран")], .black),
+            w("3", "focal — zsh — 120×40", "Terminal", "/System/Applications/Utilities/Terminal.app", [tr("other desktop", "інший робочий стіл")], NSColor(white: 0.12, alpha: 1)),
+            w("4", tr("Trip ideas", "Ідеї для відпустки"), "Notes", "/System/Applications/Notes.app", ["U28 Display"], .systemYellow),
+            w("5", tr("Inbox — Work", "Робоча пошта"), "Mail", "/System/Applications/Mail.app", [], .systemBlue),
+            w("6", "Тиждень", "Calendar", "/System/Applications/Calendar.app", [tr("minimized", "згорнуте")], .systemRed),
+            w("7", tr("Focus playlist", "Музика — Плейлист «Фокус»"), "Music", "/System/Applications/Music.app", [], .systemPink),
+            SwitchItem(id: "c1", kind: .noWindows(me), title: "Safari + Notes", subtitle: tr("The Wild West — S1E4 · Trip ideas", "Серіал — сезон 1 · Ідеї для відпустки"),
+                       icon: nil, symbol: "clock.arrow.circlepath", badges: [tr("previous set", "попередній набір")]),
+            SwitchItem(id: "l1", kind: .noWindows(me), title: tr("Work", "Робота"), subtitle: "Mail + Calendar + Terminal",
                        icon: nil, symbol: "square.grid.2x2", badges: ["⌃⌥1"]),
         ]
     }
@@ -108,16 +110,16 @@ enum DocsRender {
         }
         return [
             w("1", "Q4 roadmap — Pages", "Pages", "/Applications/Pages.app", [], .systemOrange),
-            w("2", "The Wild West — S1E4", "Safari", "/Applications/Safari.app", ["повний екран"], .black),
-            w("3", "focal — zsh — 120×40", "Terminal", "/System/Applications/Utilities/Terminal.app", ["інший робочий стіл"], NSColor(white: 0.12, alpha: 1)),
+            w("2", "The Wild West — S1E4", "Safari", "/Applications/Safari.app", [tr("full screen", "повний екран")], .black),
+            w("3", "focal — zsh — 120×40", "Terminal", "/System/Applications/Utilities/Terminal.app", [tr("other desktop", "інший робочий стіл")], NSColor(white: 0.12, alpha: 1)),
             w("4", "Trip ideas", "Notes", "/System/Applications/Notes.app", ["Studio Display"], .systemYellow),
             w("5", "Inbox — Work", "Mail", "/System/Applications/Mail.app", [], .systemBlue),
-            w("6", "This week", "Calendar", "/System/Applications/Calendar.app", ["згорнуте"], .systemRed),
+            w("6", "This week", "Calendar", "/System/Applications/Calendar.app", [tr("minimized", "згорнуте")], .systemRed),
             w("7", "Focus playlist", "Music", "/System/Applications/Music.app", [], .systemPink),
             w("8", "Release checklist", "Reminders", "/System/Applications/Reminders.app", [], .systemTeal),
             w("9", "Downloads", "Finder", "/System/Library/CoreServices/Finder.app", [], .systemBlue),
             w("10", "Family", "Messages", "/System/Applications/Messages.app", [], .systemGreen),
-            w("11", "Lisbon", "Maps", "/System/Applications/Maps.app", ["інший робочий стіл"], .systemMint),
+            w("11", "Lisbon", "Maps", "/System/Applications/Maps.app", [tr("other desktop", "інший робочий стіл")], .systemMint),
             w("12", "Invoice.pdf", "Preview", "/System/Applications/Preview.app", [], .systemGray),
         ]
     }
@@ -128,13 +130,13 @@ enum DocsRender {
         let me = NSRunningApplication.current
         return [
             SwitchItem(id: "h1", kind: .noWindows(me), title: "The Wild West — S1E4", subtitle: "Google Chrome", icon: chrome, symbol: nil,
-                       badges: ["повний екран", "окремий Space"]),
+                       badges: [tr("full screen", "повний екран"), "окремий Space"]),
             SwitchItem(id: "h2", kind: .noWindows(me), title: "Senior iOS Engineer — Job board", subtitle: "Google Chrome", icon: chrome, symbol: nil,
-                       badges: ["інший робочий стіл"]),
+                       badges: [tr("other desktop", "інший робочий стіл")]),
             SwitchItem(id: "h3", kind: .noWindows(me), title: "Swift Concurrency — Docs", subtitle: "Google Chrome", icon: chrome, symbol: nil,
                        badges: ["MacBook Pro"]),
             SwitchItem(id: "h4", kind: .noWindows(me), title: "Weekend plans", subtitle: "Google Chrome", icon: chrome, symbol: nil,
-                       badges: ["згорнуте"]),
+                       badges: [tr("minimized", "згорнуте")]),
         ]
     }
 
@@ -164,16 +166,16 @@ private struct SnapDiagram: View {
         HStack(spacing: 28) {
             display(name: "Built-in", width: 360) {
                 region("⌃⌥←", x: 0, y: 0, w: 0.5, h: 1, tint: .blue)
-                region("⌃⌥↑ з половини", x: 0.5, y: 0, w: 0.5, h: 0.5, tint: .purple)
-                region("⌃⌥↓ з половини", x: 0.5, y: 0.5, w: 0.5, h: 0.5, tint: .teal)
+                region(tr("⌃⌥↑ from a half", "⌃⌥↑ з половини"), x: 0.5, y: 0, w: 0.5, h: 0.5, tint: .purple)
+                region(tr("⌃⌥↓ from a half", "⌃⌥↓ з половини"), x: 0.5, y: 0.5, w: 0.5, h: 0.5, tint: .teal)
             }
             VStack(spacing: 10) {
                 Text("⌃⌥⇧← / →").font(.system(size: 15, weight: .semibold, design: .monospaced))
                 Image(systemName: "arrow.left.arrow.right").font(.system(size: 30))
-                Text("на інший дисплей\nі одразу на весь екран").font(.system(size: 12)).multilineTextAlignment(.center).foregroundStyle(.secondary)
+                Text(tr("to the other display,\nmaximized", "на інший дисплей\nі одразу на весь екран")).font(.system(size: 12)).multilineTextAlignment(.center).foregroundStyle(.secondary)
             }
-            display(name: "Монітор", width: 440) {
-                region("⌃⌥↑  на весь екран", x: 0, y: 0, w: 1, h: 1, tint: .green)
+            display(name: tr("Monitor", "Монітор"), width: 440) {
+                region(tr("⌃⌥↑  full screen", "⌃⌥↑  на весь екран"), x: 0, y: 0, w: 1, h: 1, tint: .green)
             }
         }
         .padding(40)

@@ -71,11 +71,11 @@ final class SwitcherModel: ObservableObject {
         let windows = Windows.items()
         var items: [SwitchItem] = windows.map { w in
             var badges: [String] = []
-            if w.isFullScreen { badges.append("повний екран") }
-            if w.isMinimized { badges.append("згорнуте") }
-            else if !w.isOnScreen { badges.append(w.isFullScreen ? "окремий Space" : "інший робочий стіл") }
+            if w.isFullScreen { badges.append(tr("full screen", "повний екран")) }
+            if w.isMinimized { badges.append(tr("minimized", "згорнуте")) }
+            else if !w.isOnScreen { badges.append(w.isFullScreen ? tr("own Space", "окремий Space") : tr("other desktop", "інший робочий стіл")) }
             else if let s = Screens.screen(for: w.frame), s !== here { badges.append(s.localizedName) }
-            else if Screens.screen(for: w.frame) == nil { badges.append("за межами екрана") }
+            else if Screens.screen(for: w.frame) == nil { badges.append(tr("off-screen", "за межами екрана")) }
             return SwitchItem(id: "w\(w.id)", kind: .window(w), title: w.title,
                               subtitle: w.app.localizedName ?? "", icon: w.app.icon, symbol: nil, badges: badges,
                               keywords: InstalledApps.fileName(w.app))
@@ -85,7 +85,7 @@ final class SwitcherModel: ObservableObject {
         let now = Windows.visibleWindowIDs().signature
         for ctx in contexts.history.filter({ !$0.signature.isSubset(of: now) }).prefix(6) {
             items.append(SwitchItem(id: "c\(ctx.id)", kind: .context(ctx), title: ctx.label, subtitle: ctx.detail,
-                                    icon: nil, symbol: "clock.arrow.circlepath", badges: ["попередній набір"]))
+                                    icon: nil, symbol: "clock.arrow.circlepath", badges: [tr("previous set", "попередній набір")]))
         }
         for (i, layout) in layouts.layouts.enumerated() {
             items.append(SwitchItem(id: "l\(layout.id)", kind: .layout(layout, index: i), title: layout.name,
@@ -96,8 +96,8 @@ final class SwitcherModel: ObservableObject {
         let withWindows = Set(windows.map(\.pid))
         for app in Windows.regularApps() where !withWindows.contains(app.processIdentifier) {
             items.append(SwitchItem(id: "a\(app.processIdentifier)", kind: .noWindows(app),
-                                    title: app.localizedName ?? "?", subtitle: "немає відкритих вікон",
-                                    icon: app.icon, symbol: nil, badges: ["нове вікно"],
+                                    title: app.localizedName ?? "?", subtitle: tr("no open windows", "немає відкритих вікон"),
+                                    icon: app.icon, symbol: nil, badges: [tr("new window", "нове вікно")],
                                     keywords: InstalledApps.fileName(app)))
         }
         let running = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleURL?.standardizedFileURL })
@@ -190,7 +190,7 @@ struct SwitcherView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.system(size: 18))
-                TextField("Вікно, застосунок або набір…", text: $model.query)
+                TextField(tr("Window, app or set…", "Вікно, застосунок або набір…"), text: $model.query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 20))
                     .focused($fieldFocused)
@@ -203,9 +203,9 @@ struct SwitcherView: View {
                         if !Thumbnails.hasPermission && !model.isDemo {
                             HStack {
                                 Image(systemName: "eye.slash")
-                                Text("Щоб бачити вміст вікон, дозволь Focal «Запис екрана».")
+                                Text(tr("Allow Focal to use Screen Recording to see what's in each window.", "Щоб бачити вміст вікон, дозволь Focal «Запис екрана»."))
                                 Spacer()
-                                Button("Дозволити…") { Thumbnails.requestPermission() }
+                                Button(tr("Allow…", "Дозволити…")) { Thumbnails.requestPermission() }
                             }
                             .font(.system(size: 12)).padding(.horizontal, 14).padding(.top, 10)
                         }
@@ -235,11 +235,11 @@ struct SwitcherView: View {
                 }
             }
             if model.visible.isEmpty {
-                Text("Нічого не знайдено").foregroundStyle(.secondary).padding()
+                Text(tr("Nothing found", "Нічого не знайдено")).foregroundStyle(.secondary).padding()
                 Spacer()
             }
             Divider()
-            Text("↩ відкрити тут   ⌘↩ відкрити на своєму місці   ⌘W закрити   ⌘M згорнути   esc")
+            Text(tr("↩ open here   ⌘↩ open in place   ⌘W close   ⌘M minimize   esc", "↩ відкрити тут   ⌘↩ відкрити на своєму місці   ⌘W закрити   ⌘M згорнути   esc"))
                 .font(.system(size: 11)).foregroundStyle(.secondary)
                 .padding(.vertical, 7)
         }

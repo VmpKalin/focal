@@ -9,8 +9,8 @@ enum InstalledApps {
         let searchable: String
 
         var item: SwitchItem {
-            SwitchItem(id: "i\(url.path)", kind: .launch(url), title: name, subtitle: "не запущено",
-                       icon: NSWorkspace.shared.icon(forFile: url.path), symbol: nil, badges: ["запустити"])
+            SwitchItem(id: "i\(url.path)", kind: .launch(url), title: name, subtitle: tr("not running", "не запущено"),
+                       icon: NSWorkspace.shared.icon(forFile: url.path), symbol: nil, badges: [tr("launch", "запустити")])
         }
     }
 

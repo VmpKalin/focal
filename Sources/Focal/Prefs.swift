@@ -17,6 +17,7 @@ enum Prefs {
         static let maximizeOnDisplayMove = "maximizeOnDisplayMove"
         static let switcherStyle = "switcherStyle"
         static let replaceCommandTab = "replaceCommandTab"
+        static let language = "language"
     }
 
     static func registerDefaults() {
@@ -32,6 +33,7 @@ enum Prefs {
             Key.maximizeOnDisplayMove: true,
             Key.switcherStyle: "list",
             Key.replaceCommandTab: true,
+            Key.language: "system",
         ])
     }
 

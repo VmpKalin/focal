@@ -27,7 +27,7 @@ macOS thinks in apps, not windows. ⌘Tab activates Chrome, but its window is mi
 | ![Windows come to you](docs/promo/04-come-to-you.jpg) | ![Back and forward](docs/promo/05-back-forward.jpg) |
 | ![Snap like Windows](docs/promo/06-snap.jpg) | ![Fixes macOS](docs/promo/07-fixes-macos.jpg) |
 
-Raw panel renders are in [docs/screenshots](docs/screenshots). Launch copy is in [docs/marketing/launch-kit.md](docs/marketing/launch-kit.md). The app's interface is in Ukrainian for now.
+Raw panel renders are in [docs/screenshots](docs/screenshots). Launch copy is in [docs/marketing/launch-kit.md](docs/marketing/launch-kit.md). Focal speaks English and Ukrainian (Settings → Language; follows the system by default).
 
 ## Why windows get lost on a Mac
 

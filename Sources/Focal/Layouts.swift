@@ -77,18 +77,18 @@ final class LayoutStore: ObservableObject {
     /// Asks for a name and saves the current screen as a layout.
     func promptAndSaveCurrent() {
         let alert = NSAlert()
-        alert.messageText = "Зберегти поточний набір вікон"
-        alert.informativeText = "Усі вікна, які зараз видно на екранах, і їхні позиції. Відновлення: ⌃⌥1…9 (за порядком у списку)."
+        alert.messageText = tr("Save the current set of windows", "Зберегти поточний набір вікон")
+        alert.informativeText = tr("Every window visible on your displays now, with its position. Restore with ⌃⌥1…9 (in list order).", "Усі вікна, які зараз видно на екранах, і їхні позиції. Відновлення: ⌃⌥1…9 (за порядком у списку).")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        field.placeholderString = "Наприклад: Робота, Серіал"
-        field.stringValue = "Набір \(layouts.count + 1)"
+        field.placeholderString = tr("For example: Work, Series", "Наприклад: Робота, Серіал")
+        field.stringValue = tr("Set \(layouts.count + 1)", "Набір \(layouts.count + 1)")
         alert.accessoryView = field
-        alert.addButton(withTitle: "Зберегти")
-        alert.addButton(withTitle: "Скасувати")
+        alert.addButton(withTitle: tr("Save", "Зберегти"))
+        alert.addButton(withTitle: tr("Cancel", "Скасувати"))
         alert.window.initialFirstResponder = field
         NSApp.activate()
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let name = field.stringValue.trimmingCharacters(in: .whitespaces)
-        if saveCurrent(named: name.isEmpty ? "Набір \(layouts.count + 1)" : name) == nil { NSSound.beep() }
+        if saveCurrent(named: name.isEmpty ? tr("Set \(layouts.count + 1)", "Набір \(layouts.count + 1)") : name) == nil { NSSound.beep() }
     }
 }
